@@ -23,9 +23,9 @@ import type {
 } from '../../services/session/ProjectSession'
 import { registerHandle } from '../registry'
 import { ConfinementError, OUTSIDE_PROJECT_CHANGE_MESSAGE } from './ConfinementError'
+import { refuseLexicallyOutside } from './lexicalPrecheck'
 import {
   defaultConfinementDeps,
-  isInsideRoot,
   resolveConfinedPath,
   type ConfinementDeps,
   type PathPolicy,
@@ -88,7 +88,9 @@ export interface ConfinedHandleDefinition<
   /**
    * Refuse a `project`-mode path that is not lexically inside the project root
    * (as opened, or canonical) before anything is asked of the file system, so
-   * every such path gets one answer without a single `lstat` (#71).
+   * every such path gets one answer without a single `lstat` (#71). On
+   * Windows a local path spelling the project with 8.3 short names is expanded
+   * first (see {@link refuseLexicallyOutside}, #478 G6).
    */
   lexicalPrecheck?: boolean
   /** File system and path flavour for the checks; the real ones by default (tests inject fakes) */
@@ -121,24 +123,6 @@ export function getConfinedChannelDeps(): ReadonlyMap<string, ConfinementDeps> {
 }
 
 /** The paths of one call, checked in the order they were listed. */
-/**
- * The lexical half of the project check: `value` names a place under the
- * root as opened or as canonicalised. Anything that is not an absolute
- * string is left to {@link resolveConfinedPath}, which refuses it as invalid.
- */
-function refuseLexicallyOutside(
-  value: unknown,
-  snapshot: ProjectSessionSnapshot | null,
-  deps: ConfinementDeps
-): void {
-  if (!snapshot || typeof value !== 'string' || value.includes('\0') || !deps.path.isAbsolute(value)) return
-  const lexical = deps.path.resolve(value)
-  const inside =
-    isInsideRoot(lexical, snapshot.root, snapshot.caseSensitive, deps) ||
-    isInsideRoot(lexical, snapshot.realRoot, snapshot.caseSensitive, deps)
-  if (!inside) throw new ConfinementError('OUTSIDE_PROJECT')
-}
-
 async function resolveAll<TPaths extends string>(
   paths: Record<TPaths, PathBinding>,
   optionalNames: ReadonlySet<string>,
@@ -154,7 +138,7 @@ async function resolveAll<TPaths extends string>(
     if (optionalNames.has(name) && value === undefined) continue
     try {
       if (options.lexicalPrecheck && policy.mode === 'project') {
-        refuseLexicallyOutside(value, snapshot, options.deps)
+        await refuseLexicallyOutside(value, snapshot, options.deps)
       }
       resolved[name] = await resolveConfinedPath(
         value,

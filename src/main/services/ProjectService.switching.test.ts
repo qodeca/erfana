@@ -120,11 +120,17 @@ describe('ProjectService switching – session token orchestration', () => {
     } as any
 
     mockFileWatcherService = {
-      setProjectPath: vi.fn((_path) => {
-        callOrder.push('fileWatcherService.setProjectPath')
+      bindSession: vi.fn(),
+      suspendAll: vi.fn(() => {
+        callOrder.push('fileWatcherService.suspendAll')
+        return Promise.resolve()
       }),
-      stopAll: vi.fn(() => {
-        callOrder.push('fileWatcherService.stopAll')
+      resumeSuspended: vi.fn(() => {
+        callOrder.push('fileWatcherService.resumeSuspended')
+        return Promise.resolve()
+      }),
+      endSuspended: vi.fn(() => {
+        callOrder.push('fileWatcherService.endSuspended')
         return Promise.resolve()
       })
     } as any
@@ -222,14 +228,13 @@ describe('ProjectService switching – session token orchestration', () => {
 
       await projectService.switchProject(projectPath)
 
-      // Verify stopAll calls happen before setProjectPath calls
+      // Verify the suspend and stop calls happen before setProjectPath calls
       const stopAllIndices = [
-        callOrder.indexOf('fileWatcherService.stopAll'),
+        callOrder.indexOf('fileWatcherService.suspendAll'),
         callOrder.indexOf('directoryWatcherService.stopAll')
       ]
       const setProjectPathIndices = [
         callOrder.indexOf('fileService.setProjectPath'),
-        callOrder.indexOf('fileWatcherService.setProjectPath'),
         callOrder.indexOf('directoryWatcherService.setProjectPath')
       ]
 
@@ -277,7 +282,6 @@ describe('ProjectService switching – session token orchestration', () => {
       // All service updates should have been called before broadcast
       const lastSetProjectPathIndex = Math.max(
         callOrder.indexOf('fileService.setProjectPath'),
-        callOrder.indexOf('fileWatcherService.setProjectPath'),
         callOrder.indexOf('directoryWatcherService.setProjectPath')
       )
 
@@ -287,25 +291,26 @@ describe('ProjectService switching – session token orchestration', () => {
   })
 
   describe('AC-009: Project switch clears old and loads new', () => {
-    it('stopAllWatchers clears both file and directory watchers', async () => {
+    it('suspends the file watches, stops the directory watchers and ends the old file watches', async () => {
       const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
-      // Both watcher services should have stopAll called
-      expect(mockFileWatcherService.stopAll).toHaveBeenCalled()
+      expect(mockFileWatcherService.suspendAll).toHaveBeenCalled()
       expect(mockDirectoryWatcherService.stopAll).toHaveBeenCalled()
+      // The committed generation ends everything recorded before it (#478, decision 18)
+      expect(mockFileWatcherService.endSuspended).toHaveBeenCalledWith(1, 'project-switch')
+      expect(mockFileWatcherService.resumeSuspended).not.toHaveBeenCalled()
     })
 
-    it('updateServices sets new project path on all services', async () => {
+    it('updateServices sets new project path on the services; the file watcher reads the session', async () => {
       const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
-      // All three services should get the new path
       expect(mockFileService.setProjectPath).toHaveBeenCalledWith(projectPath)
-      expect(mockFileWatcherService.setProjectPath).toHaveBeenCalledWith(projectPath)
       expect(mockDirectoryWatcherService.setProjectPath).toHaveBeenCalledWith(projectPath)
+      expect(mockFileWatcherService.bindSession).toHaveBeenCalledWith(projectService.session)
     })
   })
 
@@ -431,7 +436,7 @@ describe('ProjectService switching – session token orchestration', () => {
       expect(bumpsAfterThird).toBeGreaterThan(bumpsAfterSecond)
     })
 
-    it('stopAll is called before setProjectPath in multi-service switch', async () => {
+    it('suspends and stops before setProjectPath, and ends the old file watches after it', async () => {
       const oldPath = projectDir('old-project')
       const newPath = projectDir('new-project')
 
@@ -439,20 +444,19 @@ describe('ProjectService switching – session token orchestration', () => {
 
       await projectService.switchProject(newPath)
 
-      // Get indices of all stopAll and setProjectPath calls
-      const stopAllFileIndex = callOrder.indexOf('fileWatcherService.stopAll')
+      const suspendFileIndex = callOrder.indexOf('fileWatcherService.suspendAll')
       const stopAllDirIndex = callOrder.indexOf('directoryWatcherService.stopAll')
       const setPathFileServiceIndex = callOrder.indexOf('fileService.setProjectPath')
-      const setPathFileWatcherIndex = callOrder.indexOf('fileWatcherService.setProjectPath')
       const setPathDirIndex = callOrder.indexOf('directoryWatcherService.setProjectPath')
+      const endFileIndex = callOrder.indexOf('fileWatcherService.endSuspended')
 
-      // All stopAll calls should precede all setProjectPath calls
-      expect(stopAllFileIndex).toBeLessThan(setPathFileServiceIndex)
-      expect(stopAllFileIndex).toBeLessThan(setPathFileWatcherIndex)
-      expect(stopAllFileIndex).toBeLessThan(setPathDirIndex)
+      expect(suspendFileIndex).toBeGreaterThan(-1)
+      expect(suspendFileIndex).toBeLessThan(setPathFileServiceIndex)
+      expect(suspendFileIndex).toBeLessThan(setPathDirIndex)
       expect(stopAllDirIndex).toBeLessThan(setPathFileServiceIndex)
-      expect(stopAllDirIndex).toBeLessThan(setPathFileWatcherIndex)
       expect(stopAllDirIndex).toBeLessThan(setPathDirIndex)
+      // The commit (setProjectPath runs in its onChange) comes before the end
+      expect(endFileIndex).toBeGreaterThan(setPathDirIndex)
     })
   })
 
@@ -473,7 +477,7 @@ describe('ProjectService switching – session token orchestration', () => {
 
       // Warning should be logged
       expect(logger.warn).toHaveBeenCalledWith(
-        'Stopping watchers failed (continuing)',
+        'Stopping the directory watchers failed (continuing)',
         expect.objectContaining({
           error: 'Stop failed'
         })
@@ -490,7 +494,6 @@ describe('ProjectService switching – session token orchestration', () => {
       expect(result).toMatchObject({ success: false, path: openPath, action: 'noop' })
       expect(projectService.session.current()?.root).toBe(openPath)
       expect(mockFileService.setProjectPath).not.toHaveBeenCalled()
-      expect(mockFileWatcherService.setProjectPath).not.toHaveBeenCalled()
       expect(mockDirectoryWatcherService.setProjectPath).not.toHaveBeenCalled()
     })
 
@@ -509,6 +512,59 @@ describe('ProjectService switching – session token orchestration', () => {
     })
   })
 
+  // #478 plan decision 18: the file watches keep running until just before the commit
+  describe('File watches around the commit (#478)', () => {
+    it('runs settings, then suspend, then commit, then end', async () => {
+      await seedOpenProject(projectDir('old-project'))
+      mockProjectSettingsService.loadSettings = vi.fn(() => {
+        callOrder.push('loadSettings')
+        return Promise.resolve(resolvedSettings())
+      })
+
+      await projectService.switchProject(projectDir('new-project'))
+
+      const at = (step: string): number => callOrder.indexOf(step)
+      expect(at('loadSettings')).toBeGreaterThan(-1)
+      expect(at('loadSettings')).toBeLessThan(at('fileWatcherService.suspendAll'))
+      expect(at('fileWatcherService.suspendAll')).toBeLessThan(at('fileService.setProjectPath'))
+      expect(at('fileService.setProjectPath')).toBeLessThan(at('fileWatcherService.endSuspended'))
+    })
+
+    it('does not suspend the file watches when the settings fail to load', async () => {
+      await seedOpenProject(projectDir('old-project'))
+      mockProjectSettingsService.loadSettings = vi.fn(() => Promise.reject(new Error('Invalid settings')))
+
+      const result = await projectService.switchProject(projectDir('new-project'))
+
+      expect(result.success).toBe(false)
+      expect(mockFileWatcherService.suspendAll).not.toHaveBeenCalled()
+      expect(mockFileWatcherService.resumeSuspended).not.toHaveBeenCalled()
+      expect(mockFileWatcherService.endSuspended).not.toHaveBeenCalled()
+    })
+
+    it('resumes the suspended file watches when a step after the suspend fails', async () => {
+      const openPath = projectDir('old-project')
+      await seedOpenProject(openPath)
+      // The commit itself throws, after the watches were suspended
+      const store = (projectService as unknown as { sessionStore: { commit: () => number } }).sessionStore
+      vi.spyOn(store, 'commit').mockImplementationOnce(() => {
+        throw new Error('commit failed')
+      })
+
+      const result = await projectService.switchProject(projectDir('new-project'))
+
+      expect(result).toMatchObject({ success: false, path: openPath })
+      expect(callOrder).toEqual(
+        expect.arrayContaining(['fileWatcherService.suspendAll', 'fileWatcherService.resumeSuspended'])
+      )
+      expect(callOrder.indexOf('fileWatcherService.suspendAll')).toBeLessThan(
+        callOrder.indexOf('fileWatcherService.resumeSuspended')
+      )
+      expect(mockFileWatcherService.endSuspended).not.toHaveBeenCalled()
+      expect(projectService.session.current()?.root).toBe(openPath)
+    })
+  })
+
   describe('Same project detection bypasses switch', () => {
     it('no stopAll or setProjectPath calls when switching to same project', async () => {
       const projectPath = projectDir('same-project')
@@ -522,10 +578,9 @@ describe('ProjectService switching – session token orchestration', () => {
       expect(result.action).toBe('noop')
 
       // No watcher operations
-      expect(mockFileWatcherService.stopAll).not.toHaveBeenCalled()
+      expect(mockFileWatcherService.suspendAll).not.toHaveBeenCalled()
       expect(mockDirectoryWatcherService.stopAll).not.toHaveBeenCalled()
       expect(mockFileService.setProjectPath).not.toHaveBeenCalled()
-      expect(mockFileWatcherService.setProjectPath).not.toHaveBeenCalled()
       expect(mockDirectoryWatcherService.setProjectPath).not.toHaveBeenCalled()
     })
   })
@@ -560,7 +615,6 @@ describe('ProjectService switching – session token orchestration', () => {
 
       const lastServiceUpdateIndex = Math.max(
         callOrder.indexOf('fileService.setProjectPath'),
-        callOrder.indexOf('fileWatcherService.setProjectPath'),
         callOrder.indexOf('directoryWatcherService.setProjectPath'),
         callOrder.indexOf('settingsService.setLastProjectPath'),
         callOrder.indexOf('settingsService.addRecentProject')

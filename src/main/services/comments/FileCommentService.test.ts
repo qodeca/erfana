@@ -201,19 +201,15 @@ describe('024-AC-028 item 6: file-comment:changed goes only to the owning window
     expect(h.service.watchCount).toBe(0)
   })
 
-  it('past the cap a file is listed without a watch, and a freed slot is reused', async () => {
-    await h.service.clear()
-    h = await fileCommentHarness({ service: { watchMax: 2 } })
+  it('keeps no watch cap of its own: every listed file is watched, the comments bucket lives in the watch layer (#478 S19)', async () => {
     for (const name of ['a.txt', 'b.txt', 'c.txt']) await h.project.write(name, DOC)
     await h.listOk('a.txt', { panelId: 'a' })
     await h.listOk('b.txt', { panelId: 'b' })
     expect((await h.listOk('c.txt', { panelId: 'c' })).ok).toBe(true)
-    expect(h.service.watchCount).toBe(2)
-    expect([...h.watches.open.keys()]).not.toContain(h.project.path('c.txt'))
+    expect(h.service.watchCount).toBe(3)
+    expect([...h.watches.open.keys()]).toEqual(['a.txt', 'b.txt', 'c.txt'].map(name => h.project.path(name)))
     h.service.forgetWindow(1)
     expect(h.service.watchCount).toBe(0)
-    await h.listOk('c.txt', { panelId: 'c' })
-    expect([...h.watches.open.keys()]).toEqual([h.project.path('c.txt')])
   })
 
   it('024-AC-036 a released panel is forgotten and its watch freed; another panel on the file keeps the watch', async () => {
@@ -238,16 +234,14 @@ describe('024-AC-028 item 6: file-comment:changed goes only to the owning window
     expect(await h.service.openDraft(h.caller(2), { panelId: PANEL, filePath: h.project.path('notes.txt') })).toEqual(NOT_OPEN)
   })
 
-  it('024-AC-036 freed by releases, the watch cap serves new files again', async () => {
-    await h.service.clear()
-    h = await fileCommentHarness({ service: { watchMax: 1 } })
+  it('024-AC-036 a release ends the watch, and listing the file again starts a new one', async () => {
     for (const name of ['a.txt', 'b.txt']) await h.project.write(name, DOC)
     await h.listOk('a.txt', { panelId: 'a' })
-    await h.listOk('b.txt', { panelId: 'b' })
-    expect([...h.watches.open.keys()]).toEqual([h.project.path('a.txt')])
     h.service.release(h.caller(), 'a')
+    expect(h.watches.closed).toEqual([h.project.path('a.txt')])
     await h.listOk('b.txt', { panelId: 'b' })
-    expect([...h.watches.open.keys()]).toEqual([h.project.path('b.txt')])
+    await h.listOk('a.txt', { panelId: 'a' })
+    expect([...h.watches.open.keys()]).toEqual([h.project.path('b.txt'), h.project.path('a.txt')])
   })
 
   it('a project change closes every watch and forgets every panel', async () => {

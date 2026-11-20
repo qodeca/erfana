@@ -1,368 +1,366 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Tests for the preview watch pool (Issue #74, work item 30).
+ * Tests for the preview watch pool (Issue #74, work item 30; #478 plan S17).
  *
- * A fake watcher factory stands in for `createSingleFileWatcher`, so the pool's
- * refcounting, per-preview cap and awaited teardown are pinned without chokidar
- * or a real filesystem. One test asserts the preview `awaitWriteFinish`
- * overrides (`stabilityThreshold: 50`) reach the factory.
+ * The pool is one in-process owner on the shared watch layer, each file a
+ * freshness tracker on its one source. The freshness core's fake source and
+ * fake disk stand in for `FileWatcherService` and the file system, so the
+ * pool's refcounting, its one owner and one focus member, its fan-out of
+ * changes and confirmed deletes, its safety-net check (S1, L4) and its
+ * catch-up on a page's load are pinned without chokidar. What the tracker
+ * itself guarantees (ids, restart, queued, deletes) is the shared contract's
+ * (`previewWatchPool.contract.test.ts`).
  */
-import { describe, it, expect, vi, type Mock } from 'vitest'
-import type { FSWatcher, ChokidarOptions } from 'chokidar'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('electron', () => ({ app: undefined, BrowserWindow: { getAllWindows: () => [] } }))
+vi.mock('../LoggingService', () => ({ logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
+
+import { createFakeClock, type FakeClock } from '../../../shared/freshness/__test__/fakeClock'
+import { FakeDisk } from '../../../shared/freshness/__test__/fakeDisk'
+import { FakeSource } from '../../../shared/freshness/__test__/fakeSource'
+import type { Checkable } from '../../../shared/freshness/freshnessRegistry'
+import { asMainSource, readStamp } from '../freshness/__test__/trackedWatchHarness'
 import {
   createPreviewWatchPool,
   WATCH_CATCH_UP_SLACK_MS,
-  type WatchFactory
+  type PreviewWatchPoolDeps
 } from './PreviewWatchPool'
-import { createPreviewWatchBudget } from './previewWatchBudget'
-import { PREVIEW } from '../../../shared/constants'
 
-interface FakeWatcher {
-  path: string
-  handlers: {
-    onChange: () => void
-    onUnlink: () => void
-    onError: (e: unknown) => void
-    onReady?: () => void
-  }
-  overrides?: Partial<ChokidarOptions>
-  close: Mock
-  closed: boolean
-}
+let clock: FakeClock
+let disk: FakeDisk
+let source: FakeSource
+let checks: Set<Checkable>
+let ownerCheck: (() => void) | undefined
+let sourceDisposed: boolean
+let owners: number
 
-function makeHarness(closeImpl?: (w: FakeWatcher) => Promise<void>): {
-  factory: WatchFactory
-  created: FakeWatcher[]
-} {
-  const created: FakeWatcher[] = []
-  const factory: WatchFactory = (path, handlers, overrides) => {
-    const watcher: FakeWatcher = {
-      path,
-      handlers,
-      overrides,
-      closed: false,
-      close: vi.fn(async () => {
-        watcher.closed = true
-        if (closeImpl) await closeImpl(watcher)
+beforeEach(() => {
+  clock = createFakeClock()
+  disk = new FakeDisk(clock)
+  source = new FakeSource(disk)
+  checks = new Set()
+  ownerCheck = undefined
+  sourceDisposed = false
+  owners = 0
+  for (const name of ['a.css', 'b.css', 'c.js']) disk.write(`/proj/${name}`, `${name} v1`, { silent: true })
+})
+
+function makePool(extra: Partial<PreviewWatchPoolDeps> = {}) {
+  let nextId = 0
+  return createPreviewWatchPool({
+    newId: () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, '0')}`,
+    register: (member) => {
+      checks.add(member)
+      return () => checks.delete(member)
+    },
+    clock,
+    read: (path) => readStamp(disk, path),
+    createSource: (options) => {
+      ownerCheck = options.onCheck
+      owners += 1
+      return asMainSource(source, options.ownerName, () => {
+        sourceDisposed = true
       })
-    }
-    created.push(watcher)
-    return watcher as unknown as FSWatcher
-  }
-  return { factory, created }
+    },
+    ...extra
+  })
 }
+
+const flush = (): Promise<void> => clock.run(0)
+/** Past the delete confirmation and the read retries. */
+const settled = (): Promise<void> => clock.run(3_000)
 
 describe('createPreviewWatchPool', () => {
-  it('passes the preview awaitWriteFinish overrides to the factory', () => {
-    const { factory, created } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
-
-    pool.acquire('/proj/style.css', () => {})
-
-    expect(created).toHaveLength(1)
-    expect(created[0].overrides?.awaitWriteFinish).toEqual({
-      stabilityThreshold: PREVIEW.WATCH_STABILITY_MS,
-      pollInterval: PREVIEW.WATCH_POLL_INTERVAL_MS
-    })
-    expect(PREVIEW.WATCH_STABILITY_MS).toBe(50)
-  })
-
-  it('creates one watcher per distinct path', () => {
-    const { factory, created } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
-
+  it('subscribes each distinct path once, with the preview profile', async () => {
+    const pool = makePool()
     pool.acquire('/proj/a.css', () => {})
     pool.acquire('/proj/b.css', () => {})
-
-    expect(created).toHaveLength(2)
+    await flush()
+    expect(source.subscribeCalls.map((call) => [call.filePath, call.profile])).toEqual([
+      ['/proj/a.css', 'preview'],
+      ['/proj/b.css', 'preview']
+    ])
     expect(pool.size).toBe(2)
   })
 
-  it('refcounts a re-acquired path instead of creating a second watcher', async () => {
-    const { factory, created } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
-
+  it('refcounts a re-acquired path instead of subscribing twice', async () => {
+    const pool = makePool()
     expect(pool.acquire('/proj/a.css', () => {})).toBe(true)
     expect(pool.acquire('/proj/a.css', () => {})).toBe(true)
-    expect(created).toHaveLength(1)
+    await flush()
+    expect(source.subscribeCalls).toHaveLength(1)
+
+    await pool.release('/proj/a.css')
+    expect(source.unsubscribeCalls).toEqual([])
     expect(pool.size).toBe(1)
 
-    // First release only decrements; the watcher stays open.
     await pool.release('/proj/a.css')
-    expect(created[0].closed).toBe(false)
-    expect(pool.size).toBe(1)
-
-    // Second release drops the count to zero and closes it.
-    await pool.release('/proj/a.css')
-    expect(created[0].close).toHaveBeenCalledTimes(1)
+    expect(source.unsubscribeCalls).toEqual([source.subscribeCalls[0].watchId])
     expect(pool.size).toBe(0)
   })
 
-  it('fires onChange on a change (unlink re-arms via the adapter, tested separately)', () => {
-    const { factory, created } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
-    const onChange = vi.fn()
-
-    pool.acquire('/proj/a.css', onChange)
-    // A change fires the reload signal synchronously. An unlink now flows through
-    // the re-arming adapter's atomic-save detector (covered in
-    // rearmingSingleFileWatch.test.ts), not a synchronous fire here.
-    created[0].handlers.onChange()
-
-    expect(onChange).toHaveBeenCalledTimes(1)
+  it('follows every file on one owner, with one focus member', async () => {
+    const pool = makePool()
+    pool.acquire('/proj/a.css', () => {})
+    pool.acquire('/proj/b.css', () => {})
+    pool.acquire('/proj/c.js', () => {})
+    await flush()
+    expect(owners).toBe(1)
+    expect(checks.size).toBe(1)
+    expect(source.subscriptions.size).toBe(3)
   })
 
-  it('keeps the original handler across a refcount bump', () => {
-    const { factory, created } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
+  it('fires onChange on a change, keeping the original handler across a bump', async () => {
+    const pool = makePool()
     const first = vi.fn()
     const second = vi.fn()
-
     pool.acquire('/proj/a.css', first)
     pool.acquire('/proj/a.css', second)
-    created[0].handlers.onChange()
+    await flush()
 
+    disk.write('/proj/a.css', 'a.css v2')
+    await flush()
     expect(first).toHaveBeenCalledTimes(1)
     expect(second).not.toHaveBeenCalled()
   })
 
-  it('caps new watches at MAX_WATCHED_FILES and refuses the overflow', () => {
-    const { factory, created } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
+  it('fires onChange on a delete only once it is confirmed, and again when the file is back (G4, F11)', async () => {
+    const pool = makePool()
+    const onChange = vi.fn()
+    pool.acquire('/proj/a.css', onChange)
+    await flush()
 
-    for (let i = 0; i < PREVIEW.MAX_WATCHED_FILES; i++) {
-      expect(pool.acquire(`/proj/file-${i}.css`, () => {})).toBe(true)
-    }
-    expect(pool.size).toBe(PREVIEW.MAX_WATCHED_FILES)
+    disk.remove('/proj/a.css')
+    await clock.run(100)
+    expect(onChange).not.toHaveBeenCalled()
+    await settled()
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(pool.state('/proj/a.css')?.content).toEqual({ kind: 'deleted' })
 
-    // The 17th distinct path is refused and watches nothing.
-    expect(pool.acquire('/proj/overflow.css', () => {})).toBe(false)
-    expect(created).toHaveLength(PREVIEW.MAX_WATCHED_FILES)
-    expect(pool.size).toBe(PREVIEW.MAX_WATCHED_FILES)
+    disk.write('/proj/a.css', 'a.css back', { silent: true })
+    await clock.run(8_000)
+    expect(onChange).toHaveBeenCalledTimes(2)
+    expect(pool.state('/proj/a.css')?.content).toEqual({ kind: 'fresh' })
   })
 
-  it('honours an injected smaller cap', () => {
-    const { factory } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory, maxWatched: 2 })
+  it('a delete and recreate inside the confirm window reports only the new content (G4)', async () => {
+    const pool = makePool()
+    const onChange = vi.fn()
+    pool.acquire('/proj/a.css', onChange)
+    await flush()
 
-    expect(pool.acquire('/a', () => {})).toBe(true)
-    expect(pool.acquire('/b', () => {})).toBe(true)
-    expect(pool.acquire('/c', () => {})).toBe(false)
+    disk.remove('/proj/a.css')
+    disk.write('/proj/a.css', 'a.css recreated')
+    await settled()
+    expect(pool.state('/proj/a.css')?.content).toEqual({ kind: 'fresh' })
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it('re-acquires an existing path even at the cap (no new descriptor)', () => {
-    const { factory } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory, maxWatched: 1 })
+  it('accepts a file past the bucket as queued, and reports a change once it gets its slot (G9)', async () => {
+    const pool = makePool()
+    const onChange = vi.fn()
+    source.scriptSubscribe({ kind: 'queued' })
+    expect(pool.acquire('/proj/a.css', onChange)).toBe(true)
+    await flush()
+    expect(pool.state('/proj/a.css')?.watch).toEqual({ kind: 'queued' })
 
-    expect(pool.acquire('/a', () => {})).toBe(true)
-    // Cap reached, but re-acquiring the SAME path just bumps the refcount.
-    expect(pool.acquire('/a', () => {})).toBe(true)
-    expect(pool.size).toBe(1)
+    disk.write('/proj/a.css', 'a.css v2', { silent: true })
+    source.promote(source.subscribeCalls[0].watchId)
+    await settled()
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it('releaseAll awaits every close before resolving', async () => {
-    let settled = 0
-    const { factory, created } = makeHarness(
-      () =>
-        new Promise<void>((resolve) => {
-          setTimeout(() => {
-            settled += 1
-            resolve()
-          }, 5)
-        })
-    )
-    const pool = createPreviewWatchPool({ createWatcher: factory })
+  it('a check reports a file whose content changed unheard – an mtime-keeping copy too (S1, L4)', async () => {
+    const pool = makePool()
+    const onChange = vi.fn()
+    pool.acquire('/proj/a.css', onChange)
+    await flush()
 
-    pool.acquire('/a', () => {})
-    pool.acquire('/b', () => {})
+    // Nothing changed: no reload
+    pool.recheck()
+    await flush()
+    expect(onChange).not.toHaveBeenCalled()
 
-    await pool.releaseAll()
-
-    expect(settled).toBe(2)
-    expect(created.every((w) => w.closed)).toBe(true)
-    expect(pool.size).toBe(0)
+    disk.write('/proj/a.css', 'copied', { silent: true, keepMtime: true })
+    for (const member of checks) member.check('focus')
+    await settled()
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it('close() releases every watcher regardless of refcount', async () => {
-    const { factory, created } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
+  it('a power resume reaches the pool as its owner check (G8)', async () => {
+    const pool = makePool()
+    const onChange = vi.fn()
+    pool.acquire('/proj/a.css', onChange)
+    await flush()
+    disk.write('/proj/a.css', 'during sleep', { silent: true })
+    ownerCheck?.()
+    await settled()
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
 
-    pool.acquire('/a', () => {})
-    pool.acquire('/a', () => {}) // refcount 2
-    pool.acquire('/b', () => {})
+  it('after a restart, reports only a file that changed meanwhile (G1)', async () => {
+    const pool = makePool()
+    const a = vi.fn()
+    const b = vi.fn()
+    pool.acquire('/proj/a.css', a)
+    pool.acquire('/proj/b.css', b)
+    await flush()
+    disk.write('/proj/a.css', 'a.css v2', { silent: true })
+    for (const call of source.subscribeCalls) source.emit({ watchId: call.watchId, kind: 'restarted' })
+    await settled()
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).not.toHaveBeenCalled()
+  })
+
+  it('restarts an ended watch once with a new id, and not after a project switch', async () => {
+    const pool = makePool()
+    pool.acquire('/proj/a.css', () => {})
+    pool.acquire('/proj/b.css', () => {})
+    await flush()
+    const [a, b] = source.subscribeCalls.map((call) => call.watchId)
+    source.emit({ watchId: a, kind: 'ended', reason: 'watcher-error' })
+    source.emit({ watchId: b, kind: 'ended', reason: 'project-switch' })
+    await flush()
+    expect(source.subscribeCalls.map((call) => call.filePath)).toEqual(['/proj/a.css', '/proj/b.css', '/proj/a.css'])
+    expect(source.subscribeCalls[2].watchId).not.toBe(a)
+  })
+
+  it('drops a late event for a released path', async () => {
+    const pool = makePool()
+    const onChange = vi.fn()
+    pool.acquire('/proj/a.css', onChange)
+    await flush()
+    const id = source.subscribeCalls[0].watchId
+    await pool.release('/proj/a.css')
+    source.emit({ watchId: id, kind: 'changed' })
+    await settled()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('unsubscribes a watch released while its subscribe was still answering', async () => {
+    const pool = makePool()
+    source.scriptSubscribe({ kind: 'hold' })
+    pool.acquire('/proj/a.css', () => {})
+    await flush()
+    await pool.release('/proj/a.css')
+    source.releaseHeld()
+    await flush()
+    expect(source.subscriptions.size).toBe(0)
+  })
+
+  it('close() releases everything, leaves the focus check and ends its owner', async () => {
+    const pool = makePool()
+    pool.acquire('/proj/a.css', () => {})
+    pool.acquire('/proj/a.css', () => {})
+    pool.acquire('/proj/b.css', () => {})
+    await flush()
+    expect(checks.size).toBe(1)
 
     await pool.close()
-
-    expect(created.every((w) => w.close.mock.calls.length === 1)).toBe(true)
     expect(pool.size).toBe(0)
+    expect(source.subscriptions.size).toBe(0)
+    expect(checks.size).toBe(0)
+    expect(sourceDisposed).toBe(true)
   })
 
   it('release of an unknown path is a no-op', async () => {
-    const { factory } = makeHarness()
-    const pool = createPreviewWatchPool({ createWatcher: factory })
-
-    await expect(pool.release('/never-watched')).resolves.toBeUndefined()
+    const pool = makePool()
+    await expect(pool.release('/proj/never.css')).resolves.toBeUndefined()
   })
-
-  /**
-   * The budget slot is TAKEN in `acquire` and RETURNED only by `closeEntry`,
-   * which is reachable only through the entries map. A throw between the two
-   * burns the slot permanently, and the module docblock claims the take and the
-   * give "are one function apart and cannot drift" — this is the gap where they
-   * can (lens review F12).
-   *
-   * It matters because `acquire` returning false is the degrade-quietly branch:
-   * once the shared 64-slot budget is exhausted, every preview silently loses
-   * auto-refresh with nothing surfaced anywhere.
-   */
-  it('returns the budget slot when the watcher factory throws', () => {
-    const budget = createPreviewWatchBudget(1)
-    const exploding: WatchFactory = () => {
-      throw new Error('EMFILE')
-    }
-    const pool = createPreviewWatchPool({ createWatcher: exploding, budget })
-
-    expect(() => pool.acquire('/p/a.css', vi.fn())).toThrow('EMFILE')
-
-    // The single slot must be back, or the next preview never watches anything.
-    expect(budget.tryTake()).toBe(true)
-  })
-
-  it('does not leak the slot across repeated failures', () => {
-    const budget = createPreviewWatchBudget(2)
-    let calls = 0
-    const flaky: WatchFactory = (path, handlers, overrides) => {
-      calls += 1
-      if (calls <= 3) throw new Error('ENOSPC')
-      const watcher = { close: vi.fn(async () => {}) }
-      void path
-      void handlers
-      void overrides
-      return watcher as unknown as FSWatcher
-    }
-    const pool = createPreviewWatchPool({ createWatcher: flaky, budget })
-
-    for (const file of ['/p/a.css', '/p/b.css', '/p/c.css']) {
-      expect(() => pool.acquire(file, vi.fn())).toThrow('ENOSPC')
-    }
-
-    // Three failures must not have consumed the two-slot budget.
-    expect(pool.acquire('/p/d.css', vi.fn())).toBe(true)
-  })
-
 })
+
 
 /**
  * A new watch catches up on a save made after the page's load began but before
- * chokidar was listening – the gap the link scan worker widened until the AC24
- * e2e lost its first save every run.
+ * it was live – the gap the link scan worker widened until the AC24 e2e lost
+ * its first save every run. No stamp of the version the page loaded exists, so
+ * the load time picks the tracker's baseline; from there on it is stamps.
  */
 describe('createPreviewWatchPool – a new watch catches up', () => {
-  const SINCE = 10_000
-  const NOW = 10_500
   const SLACK = WATCH_CATCH_UP_SLACK_MS
+  /** `a.css`'s mtime, written fresh for each test. */
+  let savedAt: number
 
-  function catchUpHarness(stat: () => Promise<{ mtimeMs: number }>) {
-    const { factory, created } = makeHarness()
-    const statFile = vi.fn(stat)
-    const pool = createPreviewWatchPool({
-      createWatcher: factory,
-      budget: createPreviewWatchBudget(PREVIEW.MAX_WATCHED_FILES),
-      statFile,
-      now: () => NOW
-    })
-    return { pool, created, statFile }
+  beforeEach(async () => {
+    await clock.run(1_000)
+    disk.write('/proj/a.css', 'a.css saved', { silent: true })
+    savedAt = disk.stamp('/proj/a.css')?.mtimeMs ?? 0
+  })
+
+  async function open(changedSince: number, extra: Partial<PreviewWatchPoolDeps> = {}) {
+    const pool = makePool(extra)
+    const onChange = vi.fn()
+    pool.acquire('/proj/a.css', onChange, { changedSince })
+    await settled()
+    return { pool, onChange }
   }
 
-  const stamped = (mtimeMs: number) => async () => ({ mtimeMs })
-
-  /** Let the catch-up's stamp read, and the check after it, run. */
-  const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
-
-  it('reports a file saved after the load began, once, when the watch is listening', async () => {
-    const { pool, created, statFile } = catchUpHarness(stamped(SINCE + 200))
-    const onChange = vi.fn()
-    pool.acquire('/proj/a.css', onChange, { changedSince: SINCE })
-    await settle()
-    // Not before chokidar listens: a save between the read and that would be lost.
-    expect(statFile).not.toHaveBeenCalled()
-
-    created[0].handlers.onReady?.()
-    await settle()
-
-    expect(statFile).toHaveBeenCalledWith('/proj/a.css')
+  it('reports a file saved after the load began, once, when the watch is live', async () => {
+    source.scriptSubscribe({ kind: 'hold' })
+    const { onChange } = await open(savedAt - 200)
+    // Not before the watch is live
+    expect(onChange).not.toHaveBeenCalled()
+    source.releaseHeld()
+    await settled()
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it.each([
-    ['unchanged since before the load began', SINCE - SLACK - 1],
-    ['stamped in the future', NOW + SLACK + 1]
-  ])('reports nothing for a file %s', async (_label, mtimeMs) => {
-    const { pool, created } = catchUpHarness(stamped(mtimeMs))
-    const onChange = vi.fn()
-    pool.acquire('/proj/a.css', onChange, { changedSince: SINCE })
+  it("allows a stamp's coarser clock: a file stamped just before the load began is reported", async () => {
+    const { onChange } = await open(savedAt + SLACK - 1)
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
 
-    created[0].handlers.onReady?.()
-    await settle()
-
+  it('reports nothing for a file unchanged since before the load began', async () => {
+    const { onChange } = await open(savedAt + SLACK + 1)
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['just before the load began', SINCE - SLACK],
-    ['just after the clock now', NOW + SLACK]
-  ])("allows a stamp's coarser clock: a file stamped %s is reported", async (_label, mtimeMs) => {
-    const { pool, created } = catchUpHarness(stamped(mtimeMs))
+  it('reports nothing for a file stamped in the future', async () => {
+    const future = async (path: string): ReturnType<typeof readStamp> => {
+      const outcome = await readStamp(disk, path)
+      if (outcome.status !== 'ok') return outcome
+      const stamp = { ...outcome.stamp, mtimeMs: clock.now() + SLACK + 1 }
+      return { status: 'ok', version: stamp, stamp }
+    }
+    const { onChange } = await open(savedAt - 200, { read: future })
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('reports a write between the baseline and the watch going live, by stamp', async () => {
+    source.scriptSubscribe({ kind: 'hold' })
+    const pool = makePool()
     const onChange = vi.fn()
-    pool.acquire('/proj/a.css', onChange, { changedSince: SINCE })
-
-    created[0].handlers.onReady?.()
-    await settle()
-
+    pool.acquire('/proj/b.css', onChange)
+    await flush()
+    disk.write('/proj/b.css', 'b.css v2', { silent: true })
+    source.releaseHeld()
+    await settled()
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it('checks nothing without a load start, and nothing for a watch already held', async () => {
-    const { pool, created, statFile } = catchUpHarness(stamped(SINCE + 200))
+  it('checks nothing for a watch already held', async () => {
+    const pool = makePool()
     const first = vi.fn()
-    pool.acquire('/proj/plain.css', vi.fn())
-    pool.acquire('/proj/held.css', first, { changedSince: SINCE })
-    // A refcount bump opens no watcher, so it has no gap of its own to check.
-    pool.acquire('/proj/held.css', vi.fn(), { changedSince: SINCE })
-
-    expect(created).toHaveLength(2)
-    expect(created[0].handlers.onReady).toBeUndefined()
-    created[1].handlers.onReady?.()
-    await settle()
-
-    expect(statFile).toHaveBeenCalledTimes(1)
-    expect(first).toHaveBeenCalledTimes(1)
+    pool.acquire('/proj/a.css', first)
+    await settled()
+    // A refcount bump opens no watch, so it has no gap of its own to check.
+    pool.acquire('/proj/a.css', vi.fn(), { changedSince: savedAt - 200 })
+    await settled()
+    expect(first).not.toHaveBeenCalled()
   })
 
-  it('reports nothing for a watch released before its stamp was read', async () => {
-    let answer!: (stats: { mtimeMs: number }) => void
-    const { pool, created } = catchUpHarness(() => new Promise((resolve) => (answer = resolve)))
+  it('reports nothing for a watch released before it was live', async () => {
+    source.scriptSubscribe({ kind: 'hold' })
+    const pool = makePool()
     const onChange = vi.fn()
-    pool.acquire('/proj/a.css', onChange, { changedSince: SINCE })
-    created[0].handlers.onReady?.()
-
+    pool.acquire('/proj/a.css', onChange, { changedSince: savedAt - 200 })
+    await flush()
     await pool.release('/proj/a.css')
-    answer({ mtimeMs: SINCE + 200 })
-    await settle()
-
+    source.releaseHeld()
+    await settled()
     expect(onChange).not.toHaveBeenCalled()
-  })
-
-  it('reports nothing when the stamp cannot be read: a delete reaches the watch itself', async () => {
-    const gone = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-    const { pool, created } = catchUpHarness(() => Promise.reject(gone))
-    const onChange = vi.fn()
-    pool.acquire('/proj/a.css', onChange, { changedSince: SINCE })
-
-    created[0].handlers.onReady?.()
-    await settle()
-
-    expect(onChange).not.toHaveBeenCalled()
+    expect(source.subscriptions.size).toBe(0)
   })
 })

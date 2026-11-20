@@ -29,7 +29,8 @@ export function hooksEnabled(): boolean {
 const surface: ErfanaTestHooks = {
   terminalText: () => null,
   terminalCursor: () => null,
-  editorValue: () => null
+  editorValue: () => null,
+  editorView: () => null
 }
 
 /**

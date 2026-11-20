@@ -220,7 +220,7 @@ Probe `s2/` (log `s2/out-s2.log`): a ~4,800 px page (6 sections, 4 PNG images 80
 - Chromium did **not** restore the pre-reload scroll by itself: every reload landed on the `#s5` anchor (`before.y 3216`); without a hash (S3) it landed at 0. The explicit restore is required.
 - The watcher always fired within 105 ms, so the 300 ms fallback reload never triggered.
 
-**Consequence**: §7.5 steps 5–6 confirmed as designed. Note in §7.5 that the anchor jump is painted before the restore (one frame of flash at the anchor position is possible). F-001 budget: write → scroll restored uses ~15 % of the 1 s; the rest is `commentHello` → `commentState` → pin draw plus the S9 parse. Keep the 300 ms fallback as a safety net. The chokidar measurement used the same options as `PREVIEW_ENTRY_WATCH_OVERRIDES` but not the re-arming wrapper (`createRearmingSingleFileWatcher` is TS source).
+**Consequence**: §7.5 steps 5–6 confirmed as designed. Note in §7.5 that the anchor jump is painted before the restore (one frame of flash at the anchor position is possible). F-001 budget: write → scroll restored uses ~15 % of the 1 s; the rest is `commentHello` → `commentState` → pin draw plus the S9 parse. Keep the 300 ms fallback as a safety net. The chokidar measurement used the same options as the preview entry watch then did (50 ms write-finish wait, now the `preview` timing profile – #478) but not the re-arming wrapper of that time (TS source; #478 removed it).
 
 ---
 

@@ -23,7 +23,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, realpath, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import type { WebContents } from 'electron'
 
 const sends = vi.hoisted(() => [] as Array<{ id: number; channel: string; payload: Record<string, unknown> }>)
 
@@ -39,20 +38,22 @@ vi.mock('electron', () => {
 })
 
 import { FileWatcherService } from './FileWatcherService'
+import { testSession } from './watcher/__test__/testSession'
+import { WindowWatches } from './watcher/__test__/windowWatches'
 
 const EVENT_BUDGET_MS = 10_000
-const wc = (id: number): WebContents => ({ id }) as unknown as WebContents
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe('FileWatcherService keeps following an open file (#464)', () => {
   let root: string
   let svc: FileWatcherService
+  let w: WindowWatches
 
   beforeEach(async () => {
     sends.length = 0
     root = await realpath(await mkdtemp(join(tmpdir(), 'erfana-follow-')))
-    svc = new FileWatcherService()
-    svc.setProjectPath(root)
+    svc = new FileWatcherService({ session: testSession(root) })
+    w = new WindowWatches(svc, sends)
   })
 
   afterEach(async () => {
@@ -60,15 +61,14 @@ describe('FileWatcherService keeps following an open file (#464)', () => {
     await rm(root, { recursive: true, force: true })
   })
 
-  const changedFor = (id: number, filePath: string): number =>
-    sends.filter((s) => s.id === id && s.channel === 'file-watch:changed' && s.payload.filePath === filePath).length
+  const changedFor = (id: number, filePath: string): number => w.to(filePath, 'changed').filter((to) => to === id).length
 
   it(
     'still reports a plain write after many writes that leave the file briefly missing',
     async () => {
       const file = join(root, 'stress.md')
       await writeFile(file, '# start\n')
-      await svc.watchFile(file, wc(1))
+      await w.started(file, 1)
 
       // A write, then the file gone while the size check is due (it runs
       // ~100 ms after the change), then back – a delete-then-rename writer,
@@ -101,7 +101,7 @@ describe('FileWatcherService keeps following an open file (#464)', () => {
     await writeFile(file, '# linked\n')
     const asLinked = `${root.replace(/\\/g, '/')}/linked.md`
 
-    await expect(svc.watchFile(asLinked, wc(1))).resolves.toBeUndefined()
+    await expect(w.watch(asLinked, 1)).resolves.toMatchObject({ status: 'started' })
 
     await writeFile(file, '# linked, changed\n')
     await vi.waitFor(() => expect(changedFor(1, asLinked)).toBeGreaterThan(0), { timeout: EVENT_BUDGET_MS })
@@ -109,19 +109,19 @@ describe('FileWatcherService keeps following an open file (#464)', () => {
 
   it('still refuses a path outside the project, including a sibling sharing its name prefix', async () => {
     const sibling = `${root}-other`
-    await expect(svc.watchFile(join(sibling, 'a.md'), wc(1))).rejects.toThrow(
-      'Cannot watch files outside the project directory'
+    await expect(w.watch(join(sibling, 'a.md'), 1)).resolves.toEqual(
+      expect.objectContaining({ status: 'refused', code: 'OUTSIDE_PROJECT' })
     )
-    await expect(svc.watchFile(join(root, '..', 'escape.md'), wc(1))).rejects.toThrow(
-      'Cannot watch files outside the project directory'
+    await expect(w.watch(join(root, '..', 'escape.md'), 1)).resolves.toEqual(
+      expect.objectContaining({ status: 'refused', code: 'OUTSIDE_PROJECT' })
     )
   })
 
   it('keeps reporting to one window after another window that watched the same file closes', async () => {
     const file = join(root, 'shared.md')
     await writeFile(file, '# shared\n')
-    await svc.watchFile(file, wc(1))
-    await svc.watchFile(file, wc(2))
+    await w.started(file, 1)
+    await w.started(file, 2)
 
     await svc.cleanupForWebContentsId(1)
 

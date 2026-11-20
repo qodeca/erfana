@@ -20,12 +20,12 @@ Monitors open files for external content modifications.
 ### Architecture
 
 - **Library**: Chokidar (native fs events, not polling)
-- **Debouncing**: 300ms (optimized for single file saves)
+- **Write-finish wait**: per profile – 75 ms for an editor tab (`TIMING_PROFILES` in `src/shared/freshness/timingProfiles.ts`); no main-side debounce since #478
 - **Events**: `change`, `unlink`, `error`
 - **Scope**: Per-file watching (on-demand when file is opened)
-- **Limit**: 100 files maximum, app-wide (security). The cap governs **new** map entries only — joining a path that is already watched can never fail on it (#70)
+- **Limit**: 100 files for editor and image tabs, app-wide (the `tabs` bucket in `WATCH_BUCKETS`, #478). The cap counts files, not subscriptions — joining a file that is already watched can never fail on it; a subscribe past it waits in a first-in, first-out line (up to 200) and starts when a slot frees
 - **Symlinks**: `followSymlinks: false` — the watch is on the path itself, never on what a link at that path points at (#70)
-- **Consumers**: two renderer hooks – `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`. Separately, the HTML preview keeps its own main-process pool, `src/main/services/preview/PreviewWatchPool.ts`, built on the same `createSingleFileWatcher` factory with a shorter write-finish wait and capped at 16 files per preview on top of the app-wide cap – see [HTML preview § Auto-refresh](../html-preview/README.md#auto-refresh)
+- **Consumers**: every tab type that shows file content follows its file through the one watch layer and the shared freshness tracker (#478) – see [Following a file: the freshness capability](#following-a-file-the-freshness-capability-478). Renderer adapters: `useFileWatcher` (Markdown editor, read/write), `useFileChangeSubscription` (image viewer, read-only) and the Markdown preview's image store. Main-side adapters: the HTML preview's page file and its sub-files (`PreviewWatchPool`, one in-process owner per view, `preview` profile) and the comment watches. Each subscription has a `watchId` its consumer makes up, so no consumer can release another's – see [HTML preview § Auto-refresh](../html-preview/README.md#auto-refresh)
 
 ### Use Cases
 
@@ -33,62 +33,132 @@ Monitors open files for external content modifications.
 |----------|----------|
 | File modified externally, no local changes | Auto-reload silently, show "Reloaded from disk" in toolbar (1s) |
 | File modified externally, has unsaved changes | Show orange conflict bar with options |
-| File replaced atomically (write temp + rename) | Surfaces as `file-watch:changed`, not a delete — see [Single-file watch internals](#single-file-watch-internals-70) |
+| File replaced atomically (write temp + rename) | Surfaces as a `changed` event, not a delete — see [Single-file watch internals](#single-file-watch-internals-70) |
 | Erfana's own save of a document or of `~/.erfana/settings.json` | Crash-safe: `atomicWriteText` / `atomicWriteJSON` (`src/main/utils/atomicWrite.ts`) write a same-folder temp file named `.erfana-tmp-<uuid>` (settings use `.<uuid>.tmp`), fsync it, then rename it over the target – so the editor's own save is the atomic-replace row above. Symlinked, hard-linked, read-only, foreign-owned files and mounts that cannot rename are written in place instead. `.erfana-tmp-*` is dropped by `shouldDropRel` in `watcher/DirectoryWatcherCore.ts` (both backends) and skipped by the tree walk, so it never shows in the tree or triggers a reload; temp files older than 10 minutes left by a crash are swept in the background when a project opens (`atomicTempSweep.ts`) |
-| File deleted externally | Show red warning banner, keep editor state. Autosave stays off while the tab shows the deleted state (`shouldAutosave` in `components/Panels/autosaveGate.ts`), so typing never writes the file back; only the tab's own Cmd/Ctrl+S does, and autosave resumes when the banner goes away (#460) |
-| Deleted file comes back (branch switch, merge) | The delete ended the watch, so while a tab shows the deleted state it asks for the file again every 2 s (`DELETED_FILE_PROBE_INTERVAL_MS` in `src/shared/deletedFileProbe.ts`; one `stat`, never overlapping, stopped when the tab closes or the file is back – `hooks/useDeletedFileProbe.ts`). An unedited editor tab reloads the file and is watched again; a tab the user typed in while deleted gets the conflict bar instead (no conflict if the file already holds the buffer's text); an image tab runs `recover()`. The HTML preview does the same main-side in `previewEntryWatch.ts`: it re-opens the page's watcher and reports a change, so the page reloads and leaves the failed state. A probe, not the project watcher's `add`, because that watcher does not see excluded, hidden or ignored folders or files outside the project (#450) |
+| File deleted externally | The deleted notice ("… was deleted, renamed or moved on disk.") with **Restore file** and **Close tab** in the editor, **Close tab** in the image viewer (#478 F14); the editor keeps its text. Autosave stays off while the tab shows the deleted state (`shouldAutosave` in `components/Panels/autosaveGate.ts`), so typing never writes the file back; only the tab's own Cmd/Ctrl+S or **Restore file** does, and autosave resumes when the notice goes away (#460) |
+| Deleted file comes back (branch switch, merge) | The delete ended the watch, so while a tab shows the deleted state its tracker probes for the file on a back-off of 0.5 s up to 2 s (`DELETED_PROBE_BACKOFF` in `src/shared/freshness/timingProfiles.ts`; one probe at a time, stopped when the tab closes or the file is back). When it is back the tracker subscribes again and reads it: an unedited editor tab shows the file; a tab the user typed in while deleted gets the conflict bar instead (no conflict if the file already holds the buffer's text); an image tab shows the new image. The HTML preview does the same main-side in `previewEntryWatch.ts`: it re-opens the page's watcher and reports a change, so the page reloads and leaves the failed state. A probe, not the project watcher's `add`, because that watcher does not see excluded, hidden or ignored folders or files outside the project (#450) |
 | Parent folder renamed, moved or deleted externally | Same as a delete: banner, `(deleted)` in the tab. A single-file chokidar watch hears nothing when its parent folder is renamed, so the project watcher's removals are forwarded to `FileWatcherService.handleAncestorRemovals` (both backends), which runs the affected watch through the normal unlink branch, existence re-check included. A removal that lands while the project watch is paused for one of the app's own operations is forwarded when the pause ends (`PauseEpisode.externalRemovals`, kept as the top-most removed folder). The operation's own removals are left out when it noted them (`noteInternalChange`, usually after their events arrived). Past 256 remembered removals the deepest are folded into their folder, and the open files under that folder are checked on disk instead of being reported; after a resync, or past the internal-change cap, the same check covers the whole watch (`checkWatchedFilesUnder`, which skips the paths the operation removed itself) (#252) |
 | Folder above an open file renamed or deleted where the project watcher cannot see | Same banner. The project watcher never reports an excluded, hidden or ignored folder (`dist`, `node_modules`, a `files.exclude` entry), so `FileWatcherService` re-checks the files `DirectoryWatcherService.reportsRemovalsAbove` cannot speak for (`watcher/unseenWatchProbe.ts`, #252): only this session's files inside the project, one `stat` at a time with a 1 s time box (a timeout counts as present), every 2 s plus the last round's duration, and only while some open file is unseen. A file is reported after two rounds in a row found it gone, and never while the app's own operation is removing it. Here only ENOENT/ENOTDIR count as gone, and a locked or unreadable file (EBUSY, EPERM, EACCES, EIO) is still there (`watcher/pathPresence.ts`) |
 | An open file that cannot be read when its unlink arrives | It counts as still there and the watch is re-armed, as with the probe. The exception is Windows: a file deleted while another process holds it open answers EPERM or EBUSY until the last handle closes ("delete pending"). On win32 only, the unlink branch asks such a file again after 250 ms (`isPresentAfterSettle`): one that clears is re-armed, one that answers EPERM or EBUSY again ends as **deleted** – keeping a watch on it would stop its folder being deleted. A replacement that cannot be resolved because it is gone is also a delete, never `WATCH_DEAD_OUTSIDE_PROJECT` (#252) |
 | Save fails (any reason) | One error toast with the reason (wording from `formatSaveError` in `utils/errorUtils.ts`); the tab stays dirty and the buffer keeps the edit. A failing autosave repeats the toast only when the reason changes (reset when the panel switches file). A save by id through `editorSaveRegistry` shows no panel toast – its caller toasts on `false` |
-| "Save to restore it" when the folder is gone | Only the tab's own **Cmd/Ctrl+S** of a tab already in the deleted state passes `createParentDirs`, so main recreates the missing folders (inside the project only, nearest existing ancestor checked canonically like `resolveInsideProject` – `file/restoreParentDirectory.ts`) and writes the file back at its original path. An autosave does not run at all while the tab is in the deleted state: the file can come back (a branch switch) before the next probe sees it, and an autosave in that gap would overwrite it with no conflict choice (#450, #460); autosave resumes once the deleted state clears. A save by id (e.g. the preview-move unsaved-changes prompt) never recreates a folder; it fails with the toast instead. If the project folder itself is gone the reason says so. Any save or reload that clears the deleted state also starts a new watch – main ended the old one, every count with it, on the delete, so the renderer's slot forgets its hold then (`forgetFileWatch`) and sends no `stop` that could take another tab's count for the same file – so later outside edits reach the tab without reopening it (#252) |
-| Watch dies for any other reason | `file-watch:error` — the consumer shows a degraded state instead of silently going stale (#70). A watch the main process ended carries `ended: true`, and the renderer slot forgets its hold, as on a delete, so no later `stop` takes another tab's count (#252). The Markdown editor shows "Auto-refresh stopped" with **Reload** (`WatchStoppedNotice`; `useFileWatcher.isWatchUnavailable` / `restartWatch`), as it does when the watch never started; Reload releases any hold, starts the watch again and re-reads the file unless the tab holds unsaved edits (#464) |
-| File briefly missing or locked mid-write (delete-then-rename writer, `git checkout`, antivirus on Windows) | The change waits in `watcher/writeFinishGate.ts`, not in chokidar's `awaitWriteFinish`: chokidar 5.0.0 kept a dead "pending write" entry when its size check hit ENOENT/EPERM and swallowed every later change for the path. The gate counts a failed check as "still being written" and always ends a wait (at most 5 s), so the next change is always reported (#464) |
-| Path from a terminal link (`C:/proj/a.md` on Windows) | Accepted: `watchFile` checks containment with `isLexicallyInside` on resolved paths, not a string prefix (which refused the forward-slash form and let a `proj-other` sibling through) (#464) |
-| One of two windows watching the same file closes | The other keeps its changes: `cleanupForWebContentsId` bumps the session for #59 and moves every surviving watch to the new session (#464) |
-| Rapid changes (git operations) | Debounced to single reload |
+| **Restore file** (or Cmd/Ctrl+S) when the folder is gone | Only the tab's own **Cmd/Ctrl+S** or **Restore file** of a tab already in the deleted state passes `createParentDirs`, so main recreates the missing folders (inside the project only, nearest existing ancestor checked canonically like `resolveInsideProject` – `file/restoreParentDirectory.ts`) and writes the file back at its original path. An autosave does not run at all while the tab is in the deleted state: the file can come back (a branch switch) before the next probe sees it, and an autosave in that gap would overwrite it with no conflict choice (#450, #460); autosave resumes once the deleted state clears. A save by id (e.g. the preview-move unsaved-changes prompt) never recreates a folder; it fails with the toast instead. If the project folder itself is gone the reason says so. A restore writes with no stamp check (there is no file to compare – F7), and the tracker subscribes again with a new `watchId`, so later outside edits reach the tab without reopening it (#252) |
+| Watch dies for any other reason | An `ended` event with its reason. The tracker restarts the watch once on its own; if that is refused too, the tab shows "Auto-refresh stopped for … Changes on disk no longer show here." with **Reload** – never a silent stale tab (#70, #464, #478 G5). Reload subscribes again and reads the file (the editor holds the conflict instead when it has unsaved edits). A project that closed ends the watch quietly |
+| File briefly missing or locked mid-write (delete-then-rename writer, `git checkout`, antivirus on Windows) | The change waits in `watcher/writeFinishGate.ts`, not in chokidar's `awaitWriteFinish`: chokidar 5.0.0 kept a dead "pending write" entry when its size check hit ENOENT/EPERM and swallowed every later change for the path. The gate counts a failed check as "still being written" and always ends a wait (at most 5 s), so the next change is always reported (#464). A change reported at that cap is marked forced: the file may still be being written, so the tab's tracker waits for it to settle before it reads and never shows it half-written (#478, P3) |
+| File replaced by an atomic save (temp file, then rename over it) | The watch is re-armed on the new file and the change is read at once: unlike a change at the gate's cap, it is not marked forced. **Known limit** (#478, P3 trade-off): a writer that deletes the file and then streams the new one slowly can show a partial version for a moment; its next change, held by the write gate until the writes settle, corrects it. Settling here would add about 75 ms to every atomic save, the main agent write path |
+| Path from a terminal link (`C:/proj/a.md`, `c:\proj\a.md`, an 8.3 short name or a junction on Windows) | Accepted: the subscribe's lexical precheck compares resolved paths case-blind on Windows (not a string prefix), expands a local 8.3 short-name spelling of the project folder once (`ipc/confinement/lexicalPrecheck.ts`), and `armWatch` keys the watch by the file's real path – so every spelling of the same file shares one watch (#464, #478 G6). UNC and device paths are still refused before any file-system call |
+| One of two windows watching the same file closes | The other keeps its changes: subscriptions are owned per window (`webContents` id + `watchId`), and a closing, reloading or navigating window drops only its own (`FileWatcherService.dropOwner`, wired in `index.ts` by `wireWatchOwner`). The native watch closes only when its last subscription goes (#464, #478 G2) |
+| Rapid changes (git operations) | Throttled: at most one read per 250 ms per tab, and the last change is always read |
+| More tabs open than the watch cap | The tab past the cap is queued and shows the watch-limit notice ("Too many files are open to follow this one live. …", no Reload); it updates when you switch to it, and the notice clears by itself when a slot frees and the watch starts (#478 G9) |
 
 ### IPC Channels
 
+Names in `src/shared/ipc/file-watch-channels.ts`, payloads in `src/shared/ipc/file-watch-schema.ts` (#478). Every request is one strict object.
+
 | Channel | Direction | Purpose |
 |---------|-----------|---------|
-| `file-watch:start` | Renderer → Main | Start watching specific file |
-| `file-watch:stop` | Renderer → Main | Stop watching specific file |
-| `file-watch:stopAll` | Renderer → Main | Drop every watch held by this window |
-| `file-watch:pause` | Renderer → Main | Pause watching during save operation |
-| `file-watch:resume` | Renderer → Main | Resume watching after save completes |
+| `file-watch:subscribe` | Renderer → Main | Start following a file: `{ watchId, filePath, profile }` → `started` (with the file's stamp and `liveRefresh`), `queued` or `refused` with a code. Confined to the open project |
+| `file-watch:unsubscribe` | Renderer → Main | Stop one subscription (`{ watchId }`); a foreign or unknown id is a no-op |
+| `file-watch:pauseWatch` | Renderer → Main | Pause one subscription around an own save; it ends by itself after `pauseMaxMs` |
+| `file-watch:resumeWatch` | Renderer → Main | End that pause; answers whether a change was missed |
+| `file-watch:probe` | Renderer → Main | Is the file still the version named? (`same`, `changed`, `missing`, …) |
+| `file-watch:readText` | Renderer → Main | The classified text read (`ok`, `too-large`, `binary`, `encoding`, `missing`, `unreadable`; a path outside the project answers `outside-project`) |
+| `file-watch:writeText` | Renderer → Main | The checked text write: with `expectedStamp` it writes only if the file is still that version |
 | `file-watch:stats` | Renderer → Main | Watcher diagnostics |
-| `file-watch:changed` | Main → Renderer | Event: File content changed externally (**including** an atomic replace, #70) |
-| `file-watch:deleted` | Main → Renderer | Event: File genuinely deleted externally |
-| `file-watch:error` | Main → Renderer | Event: chokidar error, **or** the watch died and cannot be re-armed (#70) – then with `ended: true` (#252) |
+| `file-watch:event` | Main → Renderer | An event for one subscription: `changed`, `deleted`, `started`, `restarted` or `ended` with a reason – sent only to the window that owns it |
+| `file-watch:check` | Main → Renderer | Check every tracker now (power resume) |
 
 ### Implementation Location
 
 - **Service**: `src/main/services/FileWatcherService.ts`
 - **Watch factory**: `src/main/services/watcher/singleFileWatch.ts` (`SINGLE_FILE_WATCH_OPTIONS` + `createSingleFileWatcher`, #70)
 - **Unlink branch**: `src/main/services/watcher/atomicRearm.ts` (atomic save vs genuine delete, #70)
-- **Subscription counting**: `src/main/services/watcher/SubscriberCounter.ts` (#70)
+- **Subscriptions and buckets**: `src/main/services/watcher/watchSubscriptions.ts`, `watchBuckets.ts` (#478)
+- **Arming, health round and suspension**: `watcher/armWatch.ts` (the one place a watcher is created or re-created), `watchHealthRound.ts`, `watchSuspension.ts`; `FileWatcherService` extends `watcher/FileWatchCore.ts` (#478)
+- **Disk helpers and main-side consumers**: `src/main/services/freshness/` – `fileStamp.ts`, `probeFile.ts`, `textRead.ts`, `textWrite.ts`, `volumeKind.ts`, `mainFreshnessSource.ts`, `mainTrackedWatch.ts` (#478)
 - **Send loop**: `src/main/services/watcher/watchNotifier.ts` (#70)
 - **IPC Handlers**: `src/main/ipc/file-watcher-handlers.ts`
-- **Renderer Hooks**:
-  - `src/renderer/src/hooks/useFileWatcher.ts` (editor: echo detection, external change handling, `notifySaveComplete` action)
-  - `src/renderer/src/hooks/useFileChangeSubscription.ts` (read-only surfaces, #70)
-  - `src/renderer/src/hooks/fileWatchSlot.ts` (shared acquire/release slot, #70)
-  - `src/renderer/src/hooks/useDeletedFileProbe.ts` (looks for a deleted file until it is back, #450)
+- **Shared core**: `src/shared/freshness/` – `FreshnessTracker` (following, catching up, retries, the deleted-state probe, restarts), `saveAddOn.ts` (the editor's save), timing in `timingProfiles.ts` (#478)
+- **Renderer**:
+  - `src/renderer/src/services/freshness/` – the IPC source and the window's freshness environment (#478)
+  - `src/renderer/src/hooks/useFreshness.ts` – one tracker per tab
+  - `src/renderer/src/hooks/useFileWatcher.ts` (editor adapter: update rule, save, blocked content)
+  - `src/renderer/src/hooks/useFileChangeSubscription.ts` (image viewer adapter)
 - **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`, `src/renderer/src/components/Panels/ImageViewerPanel/`
-- **UI Component**: `src/renderer/src/components/FileConflictNotification/`
+- **UI Component**: `src/renderer/src/components/FileConflictNotification/` – `selectNotice` picks the panel's one notice (deleted > conflict > content unavailable > watch stopped > queued > limited); `FreshnessNotice` renders it and an always-mounted `role="status"` region announces it in the active tab only (#478 F13)
 
-### Self-Save Echo Detection (v0.9.1)
+### Following a file: the freshness capability (#478)
 
-The `useFileWatcher` hook prevents autosave-triggered file change events from being treated as external modifications. Three-layer defense:
+Every tab type that shows file content follows its file through one capability. The reasons and the rejected alternatives are in [ADR 0013](../adrs/0013-one-freshness-capability.md); this section is the working description.
 
-1. **`isSavingRef` guard** – Set during save operations, suppresses all change events while a save is in-flight
-2. **Content comparison (`isEchoEvent`)** – Compares incoming file content against `pendingSavedContentsRef`, a `Set` of recently saved content strings (a set, not a single ref, because rapid successive saves can leave several echoes in flight). Both sides are CRLF-normalized before comparison, so a self-save echo that arrives after the saving flag clears is still recognised. The set is cleared on reload, keep-local, file switch, and after a match
-3. **`hasLocalChangesRef`** – Ref mirror of `hasLocalChanges` state (avoids stale closures); if the user has local changes, external reload is suppressed
+**Layers.** A tab's adapter supplies only an update rule (how to read, whether to read now, what to do with what was read). The shared core in `src/shared/freshness/` (`FreshnessTracker`) does the rest: subscribe, catch up, retry, confirm a delete, restart, check. It talks to a source – IPC from the renderer (`file-watch:*`), an in-process owner in main – and `FileWatcherService` is the only watch layer behind both. The tracker holds one state object per tab, `{ watch, content }`, and every notice reads only that:
+
+- `watch`: `active` (live: full or limited), `queued` (waiting for a slot) or `stopped` with a reason (`restart-failed`, `watcher-error`, `outside-project`, `unsupported`, `project-closed`)
+- `content`: `fresh`, `changed` (held as a conflict, or deferred while the tab is hidden), `deleted`, or `unavailable` with a reason (`too-large`, `binary`, `unsupported-encoding`, `unreadable`)
+
+**Timing profiles.** All waits live in `TIMING_PROFILES` in `src/shared/freshness/timingProfiles.ts`; a consumer names a profile and never sets a number. The IPC profile enum is built from the same keys.
+
+| Profile | Used by | Settle / poll / gate cap (ms) | Tracker throttle (ms) | Delete confirmed after (ms) | Deleted-file probe (ms) | Limited poll (ms) | Watch bucket |
+|---|---|---|---|---|---|---|---|
+| `editor` | Markdown editor | 75 / 25 / 5000 | 250 | 500 | 500, backing off to 2000 | 2000 | `tabs`: 100 in all |
+| `image` | Image viewer | 75 / 25 / 5000 | 250 | 500 | 500, backing off to 2000 | 2000 | `tabs`: 100 in all |
+| `preview` | HTML preview page and sub-files | 50 / 25 / 5000 | 0 (the pool's 30 ms coalesce) | 500 | 500, backing off to 2000 | 2000 | `preview`: 16 per view, 64 in all |
+| `dependent` | Markdown preview images | 75 / 25 / 5000 | 250 | – | – | – | `dependent`: 8 per owner group, 32 in all |
+| `comments` | Comment watches | 75 / 25 / 5000 | 250 | 500 | 500, backing off to 2000 | – | `comments`: 64 |
+
+Every profile retries a failed read three times, after 100, 300 and 900 ms. Only the editor pauses a subscription around its own save, for at most 10 s. `FRESHNESS_LIMITS` in the same file holds the limits that do not vary by profile: a 100 ms atomic-save window, a waitlist of 200 per bucket, no hashing above 16 MiB, 256 cached hashes, a 10 MiB editor text limit, a 2 s ready timeout and a 2 s health round.
+
+**Total delay.** For an editor or image tab the wait before a write shows is the 75 ms gate plus up to one 25 ms poll, then the IPC hop, the read and the render – expected 130–200 ms at the median, asserted at p50 ≤ 250 ms and p95 ≤ 400 ms (`e2e/file-freshness-latency.timing.e2e.ts`, Windows, run locally). The throttle is leading plus trailing: the first change of a burst is read at once, and during a burst the tab moves at most every 250 ms and always ends on the last version. The HTML preview is the 50 ms gate plus its 30 ms coalesce; its reference speed is kept.
+
+**Reads settle first.** A read that is not the immediate answer to a change event waits until two probes one settle apart show the same size and modified time, then reads and checks the file did not move meanwhile – during the read, and between the last probe and the read (`busy` reschedules and is not a failed read). The immediate answer to a change reads at once, but only keeps what it read if the file is still at the stamp main's write gate saw the writes settle at (sent with the change); otherwise it settles too, so a new writer that started before the change reached the tab is never shown half-written. That covers the catch-up after a subscribe, the safety net, a file coming back, and a change the write gate released at its 5 s cap (marked forced). The wait is capped at the same 5 s: a file that has not held still by then is not read, and the attempt counts as a failed read, retried after 100, 300 and 900 ms with a fresh settle each time (`settleRead.ts`). So a writer that streams for longer than 5 s still ends with the complete text on screen once it stops, and never a partial one. A file that never holds still – or a path main cannot resolve, such as a dead network share – shows "cannot be read right now" after about 21 s, until a later change or check finds it still.
+
+**Safety net.** `tracker.check` compares the tab with the disk when a tab is shown, when the window gets focus, after a power resume, after a save, and every 2 s while a tab on a network or WSL volume (`liveRefresh: limited`) is visible. It probes against the last stamp (size, modified and change times, file id, and a SHA-256 up to 16 MiB) and does nothing when the content is the same, so showing a tab or focusing the window never reloads it, re-renders it or moves the cursor. A copy that keeps the modified time differs in the hash and is caught. A hidden image tab marks the change as deferred and reads the file when it is shown again.
+
+**Watch ends are always told.** A project switch suspends the watchers just before it commits and ends every old subscription after it; a failed project open resumes them, so the open tabs follow again. A window reload drops that window's subscriptions when the page navigates, so repeated reloads do not use up the cap. After a power resume every watch is re-armed, a health round runs, and every tracker checks. The health round (every 2 s, one `lstat` at a time) compares each watch's file identity with the one it was armed on, because a folder that is deleted and created again can reach the project watcher as a single `change` and leave the single-file watch deaf. A watch that ends for another reason is restarted once by the tracker; if that fails too the tab shows the stopped notice.
+
+**Notices.** A panel shows one notice, by priority: deleted, conflict, content unavailable, watch stopped, watch queued, limited. `selectNotice` (`components/FileConflictNotification/freshnessNoticeCopy.ts`) holds every sentence.
+
+| State | Text (the file name is filled in) | Buttons | Editor |
+|---|---|---|---|
+| Deleted | "… was deleted, renamed or moved on disk." | **Restore file** (editor), **Close tab** | stays editable; Save restores |
+| Conflict | "… changed on disk." or, after an autosave was given up, "Not saved – … changed on disk since it was last read." | **Reload from Disk**, **Keep My Version**, Dismiss (icon button, same as Keep My Version) | stays editable |
+| Too large | "… is too large to show here (size; limit 10 MB)." plus the last-good-read sentence; the image viewer says 50 MB | **Reload** | read-only, autosave off |
+| Binary, UTF-16/32 | "… no longer contains text Erfana can show." / "… now uses a text encoding Erfana cannot show (UTF-16 or UTF-32)." | none – the next write is picked up | read-only, autosave off |
+| Unreadable | "… cannot be read right now (it may be locked or access is denied)." | **Reload** | read-only, autosave off |
+| Stopped | "Auto-refresh stopped for …. Changes on disk no longer show here." (or "… can no longer be followed: it now resolves outside the project." / "… it is not a regular file.") | **Reload** | stays editable |
+| Queued | "Too many files are open to follow this one live. It updates when you switch to it, and follows live again when a slot frees." | none | stays editable |
+| Limited | "Live refresh is limited for files on network drives and WSL. Erfana checks for changes when you switch to this tab or window." | Dismiss (hides it for this tab) | stays editable |
+
+A stopped notice for a project that is closing is not shown. The panel's single `role="status"` region announces a notice only while the panel is the active tab. When a notice closes, focus is not returned to the editor or image viewer (known gap F36, [technical debt #72](../technical-debt.md#72-known-limits-and-accepted-trade-offs-from-478-2026-11)).
+
+**How to add a tab type.**
+
+1. Write an adapter that gives the tracker an update rule: `read` (returns a version and its stamp), `readNow` (false while the tab is hidden), `apply` (`applied` or `held`) and `onState`. In the renderer build the tracker with `useFreshness`; in main use `createTrackedFileWatch` (`src/main/services/freshness/mainTrackedWatch.ts`) on a source from `createMainFreshnessSource`.
+2. Pick an existing profile in `TIMING_PROFILES`, or add one (its bucket decides the cap). Never put a timing number in the adapter.
+3. A read-only adapter must not import `saveAddOn` or `PausableSource`; an import test fails when it does.
+4. Show the tab's state through `selectNotice` and `FreshnessNotice`, so the priority, the wording and the status region stay the same.
+5. Add one short test file that calls `describeFreshnessContract` with a harness for the adapter (`src/shared/freshness/__test__/freshnessContract.ts`). A scenario the adapter cannot meet is skipped in the harness with a reason. No change to the core is needed.
+
+### Own saves (#478)
+
+The editor's save goes through the save add-on (`src/shared/freshness/saveAddOn.ts`), so the tab's own write is never taken for an outside change and an outside change during the save is never lost:
+
+1. **The pause belongs to the save** – the tab pauses only its own subscription (`file-watch:pauseWatch`, by `watchId`) around the write; another tab on the same file keeps hearing changes (L5), and a pause a dropped page never released ends by itself (G2)
+2. **Own-save identity is the written stamp** – main answers the write with the stamp it wrote, and the tracker adopts it, so the echo of that write is silent; the text is never compared, so an outside revert to text the tab saved earlier is shown (L3). Only an autosave sends `expectedStamp`, and never in the deleted state: if the file changed since the tab last read it, main writes nothing and the conflict bar says "Not saved – … changed on disk since it was last read." (F16)
+3. **`hasLocalChangesRef`** – the editor's update rule reads the tab's edited flag through a ref (no stale closures); an edited tab holds a change as the conflict instead of taking it, and a keystroke during the read counts as an edit
+
+After the write the subscription resumes; a change it missed while paused is checked at once (L1). A change that arrives during a save is delivered after it, never dropped; if another check is running when the save's check arrives, it runs once more afterwards.
+
+**Where main checks the disk.** An autosave's `file-watch:writeText` carries the stamp the tab last read. Main compares the file's stat with it (an exact match is "unchanged", no hashing; only a mismatch hashes and compares content, so a touch-only write is not a conflict) right before the rename, again before each rename retry, and before an in-place write (symlink, hard link, read-only or foreign-owned file, or the fallback after a failed rename). When the file changed, nothing is written and the tab shows the "Not saved" conflict.
+
+**Known limits** ([ADR 0013](../adrs/0013-one-freshness-capability.md)):
+
+- **No file lock.** An outside write that lands in the gap of one `lstat` plus one `rename` after the last check is overwritten by the autosave. The check is repeated before every retry and in-place write to keep the gap to two system calls.
+- **The stat after the rename.** The stamp returned for a save is taken from the final path after the commit, plus the hash of the bytes written. A write that lands between the rename and that `stat` is not taken for the tab's own: the check after every save hashes the real file, finds a hash that differs from the one written, and shows the change. Editor files are at most 10 MiB, so they are always hashed.
+- **The atomic-save re-arm reads without the write-finish wait** (see the Use Cases table above).
 
 The `MarkdownEditorPanel` coordinates via:
 - Reading content from Monaco editor model (not React state) to avoid stale closure overwrites
-- Calling `notifySaveComplete(savedContent)` after a successful write, which adds the content to `pendingSavedContentsRef`
+- Calling `watch.save({ content, trigger, generation })`, which runs the save add-on above
 - Post-save dirty re-detection: checks if Monaco buffer diverged from saved content during the save, re-marks as modified if so
 - The editor is uncontrolled (`MonacoMarkdownEditor` mounts with `defaultValue`, never `value`): it owns its buffer, and a new `content` reaches it only as an outside change – a reload, an accepted external change, the conflict bar's "Reload from Disk". `utils/monacoValueSync.ts` tells those apart from the editor's own `onChange` echo (which can lag the buffer by a few keys under load and must never be written back) and applies them as one minimal `pushEditOperations` edit, so the cursor and the undo stack survive and no `onChange` fires. Taking the disk's text also clears the tab's dirty dot (`setEditorDirty(panelId, false)` in `handleContentUpdateFromWatcher`)
 - **Undo after "Reload from Disk" brings the discarded edit back.** The reload is its own undo step, so Cmd+Z right after it restores the local text the user chose to discard – the same as a revert in VS Code. That undo is an ordinary user edit: the tab turns dirty again and autosave writes the restored text over the reloaded file about two seconds later
@@ -100,19 +170,9 @@ When a file has both external changes and unsaved local changes, an orange confl
 
 - **Reload from Disk**: Discard local changes, load external version
 - **Keep My Version**: Ignore external changes, keep local edits
-- **Dismiss**: Acknowledge conflict, decide later
+- **Dismiss**: Works exactly like **Keep My Version** – the bar goes away and autosave writes the local text over the outside change about 2 seconds later. It does **not** postpone the decision. Its accessible name says so: "Dismiss – keeps your version" (owner decision, #478 N6)
 
-**Wrap `reloadFromDisk`, never pass it as a bare `onClick` reference.** Its
-signature is `reloadFromDisk(prefetchedContent?: string)`, so React hands a
-click handler its synthetic mouse event as that first argument. Wiring
-`onClick={onReload}` therefore adopted the event as the file's new content and
-crashed the editor panel on the next render (`content.split is not a
-function`). Write `onClick={() => onReload()}`.
-
-TypeScript cannot catch a recurrence: a zero-argument signature is assignable
-to a one-argument DOM handler. `reloadFromDisk` now also ignores any argument
-that is not a string and re-reads from disk instead, but that guard is the
-second line of defence, not a licence to skip the wrapper.
+The conflict bar is the `conflict` entry of the panel's one freshness notice (`selectNotice`). Its buttons call the adapter's `reloadFromDisk`, `keepLocal` and `dismissConflict` (Dismiss is exactly Keep My Version), each wrapped by `FreshnessNotice` so a click event is never passed on as an argument. Reload from Disk discards the buffer for the disk's text; the panel keeps the cursor and scroll (F15).
 
 ---
 
@@ -127,45 +187,49 @@ Markdown editor as well; the third was renderer-side.
 A chokidar single-file watch is bound to the **inode** it opened. The dominant
 agent / design-tool write pattern is *write a temp file, rename it over the
 target*, which destroys that inode. Where the platform reports the rename as an
-`unlink`, the old behaviour emitted `file-watch:deleted`, closed the watcher and
+`unlink`, the old behaviour reported a delete, closed the watcher and
 dropped the map entry — so every later edit was invisible until the tab was
 closed and reopened.
 
-`FileWatcherService` now runs one service-level `AtomicSaveDetector` (it already
+`FileWatcherService` runs one service-level `AtomicSaveDetector` (it already
 keys pending deletes by path, and this service is 1 watcher : 1 path, so a
 per-file detector would be a `Map` with one entry × 100 watches). The branch that
-follows the detector's verdict lives in `watcher/atomicRearm.ts`:
+follows the detector's verdict lives in `watcher/atomicRearm.ts`; the re-arm itself is `armWatch`:
 
 | Verdict | Behaviour |
 |---|---|
-| File is back within the 100 ms window | Close the stale watcher, create a replacement through `createSingleFileWatcher`, mutate the existing entry in place, then **re-enter `handleFileChange`** |
-| File still gone (one final `stat` confirms) | `file-watch:deleted`, close, drop the entry — today's behaviour |
-| Session token bumped inside the window | `file-watch:error` (`WATCH_DEAD_SESSION_ENDED`), then drop — never a silent drop |
-| Path no longer resolves inside the project | `file-watch:error` (`WATCH_DEAD_OUTSIDE_PROJECT`), then drop |
-| `chokidar.watch()` throws on the replacement | `file-watch:error` (`WATCH_DEAD_REARM_FAILED`), then drop |
+| File is back within the 100 ms window | `armWatch` closes the stale watcher, re-checks confinement and creates a replacement through `createSingleFileWatcher`; the existing entry is updated in place, then a plain `changed` is emitted at once – **without** the write-finish wait (see the known limit in the table above) |
+| File still gone (one final `stat` confirms) | `deleted` to every subscription on the file, close, drop the entry |
+| Session token bumped inside the window | `ended` (`project-switch`), then drop — never a silent drop |
+| Path no longer resolves inside the project | `ended` (`outside-project`), then drop |
+| `chokidar.watch()` throws on the replacement | `ended` (`watcher-error`), then drop |
 | The watch is stopped, replaced or the service disposed while a check waits on the disk (on Windows the check can wait 250 ms for a second look) | Nothing. The detector keeps each pending check until its verdict is delivered, so `cancelPending`, `stopAll` and `dispose` also stop one already running, and the re-arm re-checks that its entry is still the watched one. A late verdict never reaches, re-arms or drops a newer watch on the same path (#252) |
-| Path vanishes between the existence check and `chokidar.watch()` | `file-watch:deleted` + drop, so no zombie entry holds a `MAX_WATCHED_FILES` slot |
+| Path vanishes between the existence check and `chokidar.watch()` | `deleted` + drop, so no zombie entry holds a watch slot |
 
-Two design points that are easy to undo by accident:
+Three design points that are easy to undo by accident:
 
-- The re-arm calls **`handleFileChange`**, never `notifyWebContents` directly. A
-  direct notify would skip the write-finish wait (`writeFinishGate`, 300 ms stable size), the
-  300 ms debounce and the `isPaused` check — so `rm x.md && <slow write> x.md`
-  would tell the editor to reload a half-written file.
-- The record is updated **in place**, so subscribers, `isPaused` and the map size
-  survive. A re-arm can therefore never trip `MAX_WATCHED_FILES`.
-- The path is re-checked for project confinement at re-arm time
-  (`utils/projectConfinement.ts`). The entry check ran before somebody else
-  replaced the file, so an in-project name can be a symlink out of the project by
-  the time the replacement lands.
+- The re-arm goes through the service's change path (`emitChange`), never straight to
+  the window, so each subscription's pause and the per-subscription delivery still
+  apply. That path does **not** run the write-finish wait: a re-arm change is plain,
+  not forced, and the tab reads it at once. Only a read that finds the file moving
+  settles first. The cost of this choice is the known limit in the Use Cases table
+  above (`rm x.md && <slow write> x.md` can show a partial file for a moment),
+  accepted in [ADR 0013](../adrs/0013-one-freshness-capability.md).
+- The record is updated **in place**, so subscriptions, their pauses and the map size
+  survive. A re-arm can therefore never trip a bucket cap.
+- The path is re-checked for project confinement at every arm, by `armWatch`:
+  `realpath`, then the inside-the-project test, then "a regular file". The entry
+  check ran before somebody else replaced the file, so an in-project name can be a
+  symlink out of the project by the time the replacement lands. A link to another
+  in-project file passes and keeps following.
 
-**Platform split — measured, not assumed.** On **macOS** (fsevents,
-`usePolling: false`) chokidar v3 reports `mv tmp target` over a watched path as
-**`change`**, not `unlink`, and the watch keeps working afterwards. That was
-measured on chokidar 3 with fsevents; on chokidar 5 a macOS single-file watch
-runs on `fs.watch`, so the answer may differ – the test below asserts the
+**Platform split — measured, not assumed.** On **macOS** an older chokidar
+(version 3, with fsevents) reported `mv tmp target` over a watched path as
+**`change`**, not `unlink`, and the watch kept working afterwards. That was
+measured then; chokidar 5 runs a macOS single-file watch on `fs.watch`, so the
+answer may differ – the test below asserts the
 disjunction either way. The re-arm
-branch is therefore **dormant on macOS**, and the ordinary debounced change path
+branch may therefore never fire on macOS, and the ordinary change path
 is what carries the fix there. The branch matters on platforms that do report
 `unlink`. This is pinned by
 `src/main/services/watcher/singleFileWatch.rename.integration.test.ts`, which
@@ -177,54 +241,28 @@ fires on a macOS box — and do not weaken that test to assert one platform's
 answer, or a platform that reports `change` and then goes deaf would break the
 fix silently.
 
-### Subscriber counting
+### Subscriptions (#478)
 
-`WatchedFile.webContentsIds: Set<number>` became
-`subscribers: SubscriberCounter` (`watcher/SubscriberCounter.ts`), a
-`Map<number, number>`. A `Set` of window ids cannot represent **two consumers
-inside one window** watching one path: the first `unwatchFile` removed the id and
-closed the watcher out from under the second, which then went permanently deaf.
+Each consumer subscribes with a `watchId` of its own (`watcher/watchSubscriptions.ts`), owned by its window or by an in-process owner. One chokidar watch serves every subscription on a file, and it closes when the last subscription on it goes; a window that closes or reloads drops all of its subscriptions together (`cleanupForWebContentsId`). Events go per subscription, so two tabs on one file each hear a change, and one tab's pause or release never touches another's.
 
-| Method | Semantics |
-|---|---|
-| `add(id)` | Increment (first add = 1) |
-| `release(id)` | Decrement; delete the key at 0; returns how many windows still hold a subscription |
-| `removeAll(id)` | Drop the key outright — the webContents itself is gone (window closed, dev refresh), so every subscription it held dies together |
-| `has` / `size` / `countFor` / `totalSubscriptions` / `ids()` | Reads for `unwatchAll`, notification and diagnostics |
+A join must never fail on the cap: an entry it joins is already counted. That is why the bucket check is
+told whether a subscribe joins a file that is already watched: a join takes no
+slot, so the cap never refuses it. A subscribe past the cap is `queued` (a waitlist of up to 200) and gets `started` when a slot frees; past the waitlist it is refused with `WATCH_FAILED`.
 
-`unwatchFile` closes the chokidar watcher only when `release()` reaches 0;
-`cleanupForWebContentsId` and `unwatchAll` use `removeAll`.
+### Renderer side: one tracker per tab
 
-The guarantee is precisely "no `release` before the last one closes the watch" —
-it holds only while every consumer that starts a watch releases it exactly once,
-and while joining an existing watch cannot fail. That is why `watchFile` checks
-`MAX_WATCHED_FILES` **after** the join branch: a refused join whose consumer
-still released on unmount would decrement a count it never incremented.
-
-### Renderer side: the read-only hook and the shared slot
-
-- **`hooks/useFileChangeSubscription.ts`** — a read-only subscription for
-  surfaces that only *display* a file. Deliberately **not** an option on
-  `useFileWatcher`: that hook is structurally text-coupled (it reads the file as
-  UTF-8 and hands a `string` to `onContentUpdate`), and its v0.9.1 echo/conflict
-  machinery is dead weight for a surface that never writes. It returns
-  `{ isReloading, isFileDeleted, isWatchUnavailable, unavailableReason,
-  markReloaded, recover }`, depends on `[filePath]` only (callbacks live in
-  refs), **never** calls `fileWatch.pause` / `resume` (those are global per path
-  with no safety timeout, so a stuck pause would deafen every consumer of that
-  path), and re-checks existence via `file:getStats` before reporting a delete.
-  `classifyWatchStartFailure` maps a refused `start` to `'limit'` only for the
-  watched-files cap, and `'watcher-error'` otherwise, so the UI never tells a
-  user to close tabs for an unrelated fault.
-- **`hooks/fileWatchSlot.ts`** — one consumer's hold on a main-process watch,
-  used by **both** hooks. `window.api.fileWatch.start` is not idempotent (it
-  increments a per-window count), so a consumer must send exactly as many stops
-  as successful starts. The slot pairs an `isHeld` flag with a serialised
-  operation queue, which makes three failure modes impossible: a double
-  acquire (leaks a slot out of the 100 available until `start` refuses for every
-  surface), an unmatched release (deafens whichever panel legitimately holds the
-  count), and a stop overtaking its own start (leaks the slot permanently).
-  `releaseFileWatch` is safe to call unconditionally in an effect cleanup.
+- **`hooks/useFreshness.ts`** – builds the tab's `FreshnessTracker` once the
+  first read is in (`ready`, with that read's stamp as the baseline, so a write
+  before the watch was live is caught up – G3), registers it for window focus
+  and power-resume checks, and disposes it with the tab. The state it returns,
+  `{ watch, content }`, is what every notice reads.
+- **`hooks/useFileWatcher.ts`** and **`hooks/useFileChangeSubscription.ts`** –
+  the editor's and the image viewer's update rules: how to read, whether to read
+  now (a hidden image tab marks the change and reads when shown), and what to do
+  with what was read. The image adapter never pauses: a viewer never saves.
+- A refused subscribe is the stopped notice, never the watch-limit one: only a
+  `queued` tab shows the watch-limit notice, so the UI never tells a user to
+  close tabs for an unrelated fault.
 
 ---
 

@@ -87,8 +87,10 @@ describe('ProjectService integration with ProjectLockService', () => {
     } as any
 
     mockFileWatcherService = {
-      setProjectPath: vi.fn(),
-      stopAll: vi.fn(() => Promise.resolve())
+      bindSession: vi.fn(),
+      suspendAll: vi.fn(() => Promise.resolve()),
+      resumeSuspended: vi.fn(() => Promise.resolve()),
+      endSuspended: vi.fn(() => Promise.resolve())
     } as any
 
     mockDirectoryWatcherService = {
@@ -458,7 +460,7 @@ describe('ProjectService integration with ProjectLockService', () => {
         return { status: 'acquired', lockPath: '/locks/hash.lock' }
       })
 
-      vi.mocked(mockFileWatcherService.stopAll).mockImplementation(async () => {
+      vi.mocked(mockFileWatcherService.suspendAll).mockImplementation(async () => {
         callOrder.push('stopWatchers')
       })
 

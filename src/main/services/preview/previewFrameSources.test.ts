@@ -338,6 +338,8 @@ describe('collectPreviewFrameSources – frames outside the project (fail closed
       release: () => Promise.resolve(),
       releaseAll: () => Promise.resolve(),
       close: () => Promise.resolve(),
+      recheck: () => {},
+      state: () => undefined,
       size: 0
     }
     const coordinator = createPreviewWatchCoordinator({ realRoot: root, pool, onChanged: vi.fn() })

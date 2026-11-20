@@ -45,6 +45,7 @@ import {
 import { sweepStaleAtomicTemps } from '../utils/atomicTempSweep'
 import { withTimeout, TimeoutError } from '../utils/withTimeout'
 import { FILE_EVENTS } from '../../shared/ipc/file-channels'
+import { createSwitchWatchers, type SwitchWatchers } from './project/switchWatchers'
 
 export interface ProjectSwitchResult {
   success: boolean
@@ -173,6 +174,8 @@ export class ProjectService {
 
   /** Read-only view of the open project; this service is its only writer */
   readonly session: ProjectSession = this.sessionStore
+  /** Suspend, resume and end the watchers around the commit (#478, plan decision 18) */
+  private readonly watchers: SwitchWatchers
 
   constructor(
     private fileService: IFileService,
@@ -183,6 +186,8 @@ export class ProjectService {
     private projectLockService: IProjectLockService
   ) {
     this.fileService.bindSession?.(this.sessionStore)
+    this.fileWatcherService.bindSession?.(this.sessionStore)
+    this.watchers = createSwitchWatchers(fileWatcherService, directoryWatcherService)
     // The services and the settings cache follow the session, so they cannot drift from it
     this.sessionStore.onChange((_prev, next) => {
       this.updateServices(next?.root ?? '')
@@ -218,28 +223,11 @@ export class ProjectService {
   }
 
   /**
-   * Stop all watchers before project switch
-   * Non-fatal: continues on error (guards prevent stale events)
-   */
-  private async stopAllWatchers(): Promise<void> {
-    try {
-      await step(this.fileWatcherService.stopAll(), 'Stopping the file watchers')
-      await step(this.directoryWatcherService.stopAll(), 'Stopping the directory watchers')
-    } catch (e) {
-      // Non-fatal: proceed with switch, guards prevent stale events
-      logger.warn('Stopping watchers failed (continuing)', {
-        error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
-      })
-    }
-  }
-
-  /**
    * Point the services at the session's root. Runs from the session's
    * `onChange`, never directly: '' means no project.
    */
   private updateServices(root: string): void {
     this.fileService.setProjectPath(root)
-    this.fileWatcherService.setProjectPath(root)
     this.directoryWatcherService.setProjectPath(root)
   }
 
@@ -310,14 +298,16 @@ export class ProjectService {
    * 2. Check if same project (no-op)
    * 3. Acquire project lock (multi-instance support)
    * 4. Validate directory exists
-   * 5. Stop watchers
+   * 5. (nothing is stopped yet, so a failure up to here leaves every watch running)
    * 6. Load and validate project settings; build the path filter
-   * 7. Commit the session (services follow through `onChange`)
+   * 7. Suspend the watchers, commit the session (services follow through
+   *    `onChange`), end the old project's file watches
    * 8. Apply project settings
    * 9. Persist settings
    * 10. Broadcast change
    * 11. Release old project lock (after successful switch)
-   * 12. On a failure in 1-6 the session is untouched (keeps old lock, releases new lock)
+   * 12. On a failure in 1-7 the session is untouched (keeps old lock, releases new lock);
+   *     watchers suspended before the failure follow again
    *
    * @throws Error if validation fails or operation fails
    */
@@ -470,6 +460,7 @@ export class ProjectService {
     let projectSettings: ResolvedProjectSettings
     let pathFilter: ProjectPathFilter
     let generation: number
+    let suspended = false
     try {
       // 4. Validate directory exists and is accessible
       const stats = await step(stat(newProjectPath), 'Project folder check').catch((error) => {
@@ -488,11 +479,6 @@ export class ProjectService {
           ErrorCode.PROJECT_NOT_DIRECTORY
         )
       }
-
-      // 5. Stop all existing watchers before switching
-      const watcherStopStart = performance.now()
-      await this.stopAllWatchers()
-      logger.debug('Project switch: watchers stopped', { durationMs: Math.round(performance.now() - watcherStopStart) })
 
       // 6. Load and validate project settings
       try {
@@ -522,7 +508,13 @@ export class ProjectService {
 
       const caseSensitive = getPlatformConfig().caseSensitive
       pathFilter = this.buildPathFilter(newProjectPath, projectSettings, caseSensitive)
-      // 7. Commit: swap the session. The services take the new path, and the
+      // 7. Suspend the watchers only now, just before the commit: only
+      // synchronous steps follow, so a failure above left every watch running
+      const watcherSuspendStart = performance.now()
+      suspended = true
+      await this.watchers.suspend()
+      logger.debug('Project switch: watchers suspended', { durationMs: Math.round(performance.now() - watcherSuspendStart) })
+      // Commit: swap the session. The services take the new path, and the
       // settings cache the loaded settings, in `onChange`.
       this.settingsForCommit = projectSettings
       generation = this.sessionStore.commit({
@@ -537,6 +529,7 @@ export class ProjectService {
       // Note: Old project lock is NOT released here - we keep it if switch fails
       this.settingsForCommit = null
       this.abandonOpen(newProjectPath, 'Failed to release lock during rollback')
+      if (suspended) await this.watchers.resume()
 
       const durationMs = Math.round(performance.now() - switchStart)
       const message = error instanceof Error ? error.message : String(error)
@@ -554,6 +547,9 @@ export class ProjectService {
         errorCode: error instanceof AppError ? error.code : undefined
       }
     }
+
+    // Nothing of the old project may stay live in the new session
+    await this.watchers.end(generation, 'project-switch')
 
     // 8. Apply project settings to services
     this.afterCommit('apply project settings', () =>
@@ -663,9 +659,9 @@ export class ProjectService {
         error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
       })
     }
-    await this.stopAllWatchers()
-
+    await this.watchers.suspend()
     const generation = this.sessionStore.commit(null)
+    await this.watchers.end(generation, 'project-closed')
 
     // A closing window is not the user forgetting the project: keep the last path
     if (ctx.reason !== 'window-destroyed') {

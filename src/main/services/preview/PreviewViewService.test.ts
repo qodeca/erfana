@@ -298,6 +298,7 @@ function makeHarness(
   )
   const watchCoordinator: IPreviewWatchCoordinator = {
     setWatchSet,
+    recheck: vi.fn(),
     dispose: vi.fn<() => Promise<void>>(() => Promise.resolve())
   }
 

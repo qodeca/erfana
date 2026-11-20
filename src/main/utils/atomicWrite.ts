@@ -153,18 +153,51 @@ const UNSUPPORTED_FS_CODES = new Set(['EXDEV', 'ENOTSUP', 'EINVAL', 'ENOSYS'])
 
 const errorCode = (error: unknown): string | undefined => (error as NodeJS.ErrnoException).code
 
-async function writeInPlace(filePath: string, data: string): Promise<void> {
+/**
+ * A last look at the target right before a commit: `true` lets the write
+ * land, `false` gives it up (nothing is written, the temp file is removed).
+ * A throw fails the write like any other error.
+ */
+export type BeforeCommit = () => Promise<boolean>
+
+/** Options of {@link atomicWriteText}. */
+export interface AtomicWriteTextOptions {
+  /**
+   * Run right before every commit: before the rename, again before each rename
+   * retry, and before an in-place write (a linked, foreign or read-only target,
+   * and the fallback after a failed create, sync or rename). Off by default.
+   */
+  beforeCommit?: BeforeCommit
+}
+
+/** What {@link atomicWriteText} did: wrote the file, or gave up because `beforeCommit` said so. */
+export type AtomicWriteTextOutcome = 'written' | 'aborted'
+
+/** In-place write, after `beforeCommit` (when given) agreed. */
+async function writeInPlace(
+  filePath: string,
+  data: string,
+  beforeCommit?: BeforeCommit
+): Promise<AtomicWriteTextOutcome> {
+  if (beforeCommit && !(await beforeCommit())) return 'aborted'
   await writeFile(filePath, data, { encoding: 'utf8', flush: true })
+  return 'written'
 }
 
 /** In-place write after the atomic route was given up, with a path-free warning. */
-async function fallBackInPlace(filePath: string, data: string, step: string, error: unknown): Promise<void> {
+async function fallBackInPlace(
+  filePath: string,
+  data: string,
+  step: string,
+  error: unknown,
+  beforeCommit?: BeforeCommit
+): Promise<AtomicWriteTextOutcome> {
   logger.warn('atomicWriteText: atomic route unavailable, writing in place', {
     step,
     code: errorCode(error),
     error: redactedLogError(error)?.message
   })
-  await writeInPlace(filePath, data)
+  return writeInPlace(filePath, data, beforeCommit)
 }
 
 /**
@@ -259,13 +292,19 @@ async function planAtomicTarget(
  *
  * On a case-insensitive disk the rename targets the on-disk spelling of the name.
  * Callers are responsible for the parent directory existing.
+ *
+ * With `options.beforeCommit`, every route asks it right before it commits
+ * (see {@link AtomicWriteTextOptions}); a `false` answer leaves the target
+ * untouched and resolves `'aborted'`.
  */
-export async function atomicWriteText(filePath: string, data: string): Promise<void> {
+export async function atomicWriteText(
+  filePath: string,
+  data: string,
+  options: AtomicWriteTextOptions = {}
+): Promise<AtomicWriteTextOutcome> {
+  const { beforeCommit } = options
   const plan = await planAtomicTarget(filePath)
-  if (plan === null) {
-    await writeInPlace(filePath, data)
-    return
-  }
+  if (plan === null) return writeInPlace(filePath, data, beforeCommit)
 
   const { target, mode } = plan
   const tempPath = join(dirname(target), `${ATOMIC_TEMP_PREFIX}${randomUUID()}`)
@@ -285,7 +324,9 @@ export async function atomicWriteText(filePath: string, data: string): Promise<v
       await handle.close()
     }
     step = 'rename'
-    await renameWithRetry(tempPath, target)
+    if (await renameWithRetryChecked(tempPath, target, beforeCommit)) return 'written'
+    await unlink(tempPath).catch(() => undefined)
+    return 'aborted'
   } catch (error) {
     await unlink(tempPath).catch(() => undefined)
     const code = errorCode(error)
@@ -295,7 +336,7 @@ export async function atomicWriteText(filePath: string, data: string): Promise<v
         ((step === 'sync' || step === 'rename') && UNSUPPORTED_FS_CODES.has(code)) ||
         (step === 'rename' && process.platform === 'win32' && RENAME_RETRYABLE.has(code)))
     if (!giveUp) throw error
-    await fallBackInPlace(filePath, data, step, error)
+    return fallBackInPlace(filePath, data, step, error, beforeCommit)
   }
 }
 
@@ -306,10 +347,20 @@ export async function atomicWriteText(filePath: string, data: string): Promise<v
  * last retry's, is thrown.
  */
 export async function renameWithRetry(from: string, to: string): Promise<void> {
+  await renameWithRetryChecked(from, to)
+}
+
+/**
+ * {@link renameWithRetry} that asks `beforeCommit` (when given) before the
+ * first rename and again before every retry: `false` stops with nothing
+ * renamed. Resolves `true` once the rename landed.
+ */
+async function renameWithRetryChecked(from: string, to: string, beforeCommit?: BeforeCommit): Promise<boolean> {
   for (let attempt = 0; attempt <= RENAME_BACKOFFS_MS.length; attempt++) {
+    if (beforeCommit && !(await beforeCommit())) return false
     try {
       await rename(from, to)
-      return
+      return true
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
       if (!code || !RENAME_RETRYABLE.has(code) || attempt === RENAME_BACKOFFS_MS.length) {

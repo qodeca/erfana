@@ -115,7 +115,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | IMG-02 | Info: dimensions, size, format, last updated | all | ImageViewerToolbar.tsx | [reference/image-viewer](./reference/image-viewer.md#supported-formats-and-information) |
 | IMG-03 | Zoom, fit, full screen | all | same | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
 | IMG-04 | Export as PNG, as PDF, copy to clipboard | all | ImageViewerExportControls.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
-| IMG-05 | Live refresh, "Reloaded from disk"; deleted-file banner with Reload; 100-file watch cap | all | ImageViewerPanel.tsx, ImageViewerBanner.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
+| IMG-05 | Live refresh, "Reloaded from disk"; deleted-file banner ("deleted, renamed or moved on disk") with Close tab; 100-file watch cap | all | ImageViewerPanel.tsx, ImageViewerBanner.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
 | IMG-06 | Mouse and keys: wheel, drag, double-click, + = - 0 F arrows Esc | all | imageViewer.logic.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
 | IMG-07 | Image paths selected in the terminal open in the viewer | all | R/components/Panels/TerminalPanel.tsx | [reference/terminal](./reference/terminal.md#file-links-and-dropped-files) |
 

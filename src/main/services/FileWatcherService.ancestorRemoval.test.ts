@@ -16,7 +16,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import type { WebContents } from 'electron'
 
 const sends = vi.hoisted(() => [] as Array<{ channel: string; payload: Record<string, unknown> }>)
 
@@ -35,13 +34,15 @@ vi.mock('electron', () => ({
 }))
 
 import { FileWatcherService } from './FileWatcherService'
+import { testSession } from './watcher/__test__/testSession'
+import { WindowWatches } from './watcher/__test__/windowWatches'
 
 const EVENT_BUDGET_MS = 5_000
-const webContents = { id: 1 } as unknown as WebContents
 
 describe('FileWatcherService.handleAncestorRemovals', () => {
   let root: string
   let svc: FileWatcherService
+  let w: WindowWatches
 
   beforeEach(async () => {
     sends.length = 0
@@ -50,8 +51,8 @@ describe('FileWatcherService.handleAncestorRemovals', () => {
     await writeFile(join(root, 'docs', 'open.md'), '# open')
     await writeFile(join(root, 'docs', 'deep', 'nested.md'), '# nested')
     await writeFile(join(root, 'other.md'), '# other')
-    svc = new FileWatcherService()
-    svc.setProjectPath(root)
+    svc = new FileWatcherService({ session: testSession(root) })
+    w = new WindowWatches(svc, sends)
   })
 
   afterEach(async () => {
@@ -59,8 +60,7 @@ describe('FileWatcherService.handleAncestorRemovals', () => {
     await rm(root, { recursive: true, force: true })
   })
 
-  const deleted = (): string[] =>
-    sends.filter(s => s.channel === 'file-watch:deleted').map(s => String(s.payload.filePath))
+  const deleted = (): string[] => w.filesWith('deleted')
 
   // Windows refuses to rename a folder while a watch holds a handle inside it (EPERM),
   // so this real-fs rename needs a POSIX host.
@@ -68,9 +68,9 @@ describe('FileWatcherService.handleAncestorRemovals', () => {
     const open = join(root, 'docs', 'open.md')
     const nested = join(root, 'docs', 'deep', 'nested.md')
     const other = join(root, 'other.md')
-    await svc.watchFile(open, webContents)
-    await svc.watchFile(nested, webContents)
-    await svc.watchFile(other, webContents)
+    await w.started(open)
+    await w.started(nested)
+    await w.started(other)
 
     await rename(join(root, 'docs'), join(root, 'docs2'))
     svc.handleAncestorRemovals([join(root, 'docs')])
@@ -84,13 +84,13 @@ describe('FileWatcherService.handleAncestorRemovals', () => {
 
   it('does not mark a file deleted when it is still on disk (existence re-check)', async () => {
     const open = join(root, 'docs', 'open.md')
-    await svc.watchFile(open, webContents)
+    await w.started(open)
 
     // A stale or wrong removal report: the folder is in fact still there
     svc.handleAncestorRemovals([join(root, 'docs')])
 
     await vi.waitFor(
-      () => expect(sends.some(s => s.channel === 'file-watch:changed')).toBe(true),
+      () => expect(w.kinds()).toContain('changed'),
       { timeout: EVENT_BUDGET_MS }
     )
     expect(deleted()).toEqual([])
@@ -99,7 +99,7 @@ describe('FileWatcherService.handleAncestorRemovals', () => {
 
   it('ignores removals that are not an ancestor (a sibling with a shared prefix, or the file itself)', async () => {
     const open = join(root, 'docs', 'open.md')
-    await svc.watchFile(open, webContents)
+    await w.started(open)
     const handleFileDeleted = vi.spyOn(
       svc as unknown as { handleFileDeleted: (p: string) => void },
       'handleFileDeleted'

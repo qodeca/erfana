@@ -28,7 +28,7 @@ import type {
   PreviewViewHandle,
   PreviewWebContentsHandle
 } from './PreviewSessionFactory'
-import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
+import type { PreviewEntryWatcherFactory } from './previewEntryWatch'
 import type { PreviewCommentShared } from './comments/commentServiceTypes'
 import type { PreviewLinkScanner } from './PreviewLinkScanWorkerAdapter'
 import type { HtmlSource } from './previewLinkScanProtocol'
@@ -99,10 +99,7 @@ export interface PreviewLiveViewDeps {
     wc: PreviewWebContentsHandle,
     onCount: (count: PreviewFindCount) => void
   ) => IPreviewFindController
-  readonly createEntryWatcher: (
-    filePath: string,
-    handlers: { onChange(): void; onUnlink(): void; onError(error: unknown): void }
-  ) => PreviewFileWatcherHandle
+  readonly createEntryWatcher: PreviewEntryWatcherFactory
   /**
    * The zoom factor to size a view with, read from the window it is handed –
    * the view's host (issue #124, C3). Never another window: with a second one

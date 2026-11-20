@@ -16,13 +16,15 @@
  *   spelling of one file shares one read, one `data:` URL and one slot of
  *   {@link MAX_MARKDOWN_IMAGES_PER_DOCUMENT}.
  *
- * Refresh, without a watch of its own:
- * - It listens to the signals the link checks already use
+ * Refresh:
+ * - While the preview is visible, the first images of the document are
+ *   followed live, each by a freshness tracker (`markdownImageFreshness.ts`,
+ *   #478 C3): a change is read once and handed over ({@link MarkdownImageStore.refreshFile}).
+ * - The fallback for the rest: the signals the link checks already use
  *   (`linkTargetCache.ts`): every `directory-watch:changed` batch – content
  *   edits included, since an image rewritten in place is exactly the case –
- *   and this window's own file operations (`fileStructureSignal.ts`). No file
- *   watch is added per image, so the per-file watcher budget is untouched.
- * - A burst of events is settled ({@link MARKDOWN_IMAGE_SETTLE_MS}, at most
+ *   and this window's own file operations (`fileStructureSignal.ts`).
+ * - A burst of events is settled ({@link SETTLE_MS}, at most
  *   {@link MARKDOWN_IMAGE_MAX_WAIT_MS}), then every file is asked again WITH
  *   the version of the last bytes received for it – also when those bytes did
  *   not decode. The main process answers `unchanged` after an `fstat`, so only
@@ -33,8 +35,8 @@
  * Bounds: {@link MAX_MARKDOWN_IMAGES_PER_DOCUMENT} files per preview; at most
  * {@link MARKDOWN_IMAGE_MAX_CONCURRENT_READS} reads in flight and at most one
  * waiting per file; and a byte budget for the `data:` URLs shared by every
- * preview in the window, hidden ones included ({@link ImageByteBudget},
- * {@link MARKDOWN_IMAGE_BYTE_BUDGET}). A file that does not fit keeps its
+ * preview in the window, hidden ones included (`ImageByteBudget`,
+ * `MARKDOWN_IMAGE_BYTE_BUDGET`). A file that does not fit keeps its
  * version, so a re-check is one `fstat`; it is read in full again only when
  * the budget announces a release that makes room for it.
  *
@@ -51,24 +53,21 @@
  */
 
 import {
-  MARKDOWN_IMAGE_BYTE_BUDGET,
   MAX_MARKDOWN_IMAGES_PER_DOCUMENT,
   isMarkdownImagePath,
-  type MarkdownImageReadRequest,
-  type MarkdownImageReadResponse,
   type MarkdownImageRefusal
 } from '../../../../shared/ipc/markdown-image-schema'
-import { onFileStructureChanged } from '../../services/fileStructureSignal'
-import { fileGateway } from '../../services/fileGateway'
-import { directoryWatchGateway } from '../../services/directoryWatchGateway'
-import { hasBridge, hasBridgeMethod } from '../../services/bridgePresence'
-import { markdownImageGateway } from '../../services/markdownImageGateway'
+import type { FileStamp } from '../../../../shared/freshness/freshnessTypes'
+import { TIMING_PROFILES } from '../../../../shared/freshness/timingProfiles'
 import { resolveDocumentRelativePath } from '../../utils/markdownLinkResolver'
-import { getRendererPlatform } from '../../utils/platform'
 import { logger } from '../../utils/logger'
+import type { MarkdownImageBytes, MarkdownImageFollower } from './markdownImageFreshness'
+import { defaultMarkdownImageStoreDeps, type MarkdownImageStoreDeps } from './markdownImageStoreDeps'
 
-/** Quiet period (ms) after the last change event before images are re-checked. */
-export const MARKDOWN_IMAGE_SETTLE_MS = 300
+export type { MarkdownImageStoreDeps }
+
+/** Quiet period (ms) after the last change event before images are re-checked: the `dependent` profile's settle (#478). */
+const SETTLE_MS = TIMING_PROFILES.dependent.settleMs
 /** Longest (ms) a burst of change events postpones the re-check. */
 export const MARKDOWN_IMAGE_MAX_WAIT_MS = 2_000
 /** Image reads one preview keeps in flight at once. */
@@ -85,7 +84,7 @@ export type MarkdownImageUnavailableReason =
   | MarkdownImageRefusal
   /** Past {@link MAX_MARKDOWN_IMAGES_PER_DOCUMENT} */
   | 'limit'
-  /** The window's previews already hold {@link MARKDOWN_IMAGE_BYTE_BUDGET} of images */
+  /** The window's previews already hold `MARKDOWN_IMAGE_BYTE_BUDGET` of images */
   | 'budget'
   /** The bytes arrived but could not be decoded as an image */
   | 'undecodable'
@@ -98,94 +97,6 @@ export type MarkdownImageView =
 
 /** Shown for a spelling nobody has asked about yet, or not resolved yet. */
 export const LOADING_VIEW: MarkdownImageView = Object.freeze({ status: 'loading' })
-
-/**
- * `data:` URL characters held by every preview of a window. Counting the URL
- * length rather than the file size is deliberate: the URL is what is held.
- */
-export class ImageByteBudget {
-  private used = 0
-  private readonly releaseListeners = new Set<() => void>()
-
-  constructor(private readonly limit: number) {}
-
-  /** Characters held now (for tests and measurements). */
-  get held(): number {
-    return this.used
-  }
-
-  /** Characters still free. */
-  get remaining(): number {
-    return this.limit - this.used
-  }
-
-  /**
-   * Hear about every release, so an image waiting for room can be read once
-   * there is some – rather than on every refresh.
-   *
-   * @returns The function that stops listening
-   */
-  onRelease(listener: () => void): () => void {
-    this.releaseListeners.add(listener)
-    return () => {
-      this.releaseListeners.delete(listener)
-    }
-  }
-
-  /** Take `amount` if it fits; false (and nothing taken) when it does not. */
-  reserve(amount: number): boolean {
-    if (amount <= 0) return true
-    if (this.used + amount > this.limit) return false
-    this.used += amount
-    return true
-  }
-
-  /** Give back what {@link reserve} took. */
-  release(amount: number): void {
-    if (amount <= 0) return
-    this.used = Math.max(0, this.used - amount)
-    for (const listener of [...this.releaseListeners]) listener()
-  }
-}
-
-/** One budget per window: every preview panel, hidden ones included, draws from it. */
-export const sharedImageByteBudget = new ImageByteBudget(MARKDOWN_IMAGE_BYTE_BUDGET)
-
-/** Collaborators, injectable for tests. */
-export interface MarkdownImageStoreDeps {
-  read: (request: MarkdownImageReadRequest) => Promise<MarkdownImageReadResponse>
-  getProjectPath: () => Promise<string | null>
-  /** Resolves once `url` decodes as an image; rejects when it does not */
-  decode: (url: string) => Promise<void>
-  onDirectoryChanged: (callback: () => void) => () => void
-  onFileStructureChanged: (callback: () => void) => () => void
-  platform: () => NodeJS.Platform
-  budget: ImageByteBudget
-}
-
-/** Decode off the DOM where the engine can; jsdom cannot, and is trusted. */
-async function decodeImage(url: string): Promise<void> {
-  const image = new Image()
-  image.src = url
-  if (typeof image.decode === 'function') await image.decode()
-}
-
-const defaultDeps: MarkdownImageStoreDeps = {
-  // A test renderer often installs no bridge (or a mock that answers nothing); then nothing loads.
-  read: (request) =>
-    (hasBridge('markdownImage') ? markdownImageGateway.read(request) : undefined) ??
-    Promise.resolve({ status: 'refused', reason: 'unreadable' }),
-  getProjectPath: () => fileGateway.getProjectPath(),
-  decode: decodeImage,
-  // Likewise: without a directory-watch bridge (or an unsubscribe from its mock), nothing is heard.
-  onDirectoryChanged: (callback) =>
-    (hasBridgeMethod('directoryWatch', 'onDirectoryChanged')
-      ? directoryWatchGateway.onDirectoryChanged(() => callback())
-      : undefined) ?? (() => {}),
-  onFileStructureChanged,
-  platform: getRendererPlatform,
-  budget: sharedImageByteBudget
-}
 
 /**
  * The key one file is held under. macOS and Windows volumes are usually
@@ -204,6 +115,8 @@ interface FileEntry {
   view: MarkdownImageView
   /** Version of the last bytes received – decoded or not – echoed back on the next read */
   version?: string
+  /** Stamp of the bytes shown: a live follow starts from it (#478) */
+  stamp?: FileStamp
   /** Budget characters this entry holds (its `data:` URL length) */
   bytes: number
   /** `data:` URL length of the last answer that did not fit the budget; 0 otherwise */
@@ -246,9 +159,35 @@ export class MarkdownImageStore {
   private subscribers = 0
   private inFlight = 0
   private readonly queue: Array<() => void> = []
+  private follower: MarkdownImageFollower | null = null
 
   constructor(deps: Partial<MarkdownImageStoreDeps> = {}) {
-    this.deps = { ...defaultDeps, ...deps }
+    this.deps = { ...defaultMarkdownImageStoreDeps, ...deps }
+  }
+
+  /** Show bytes the live follow already read; a read in flight for the file is dropped. */
+  refreshFile(key: string, bytes: MarkdownImageBytes): void {
+    const file = this.files.get(key)
+    if (!file) return
+    const token = ++file.token
+    void this.accept(file, bytes, () => file.token !== token || this.files.get(file.key) !== file)
+  }
+
+  /** The live follow found a file gone: ask for it again (and show it unavailable). */
+  recheckFile(key: string): void {
+    const file = this.files.get(key)
+    if (file) this.load(file)
+  }
+
+  /** Follow the shown files live while visible and in use; nothing otherwise (#478 S18). */
+  private syncFollow(): void {
+    if (!this.follower) return
+    const shown = this.visible && this.detach ? [...this.files.values()] : []
+    this.follower.sync(
+      shown.flatMap((file) =>
+        file.view.status === 'ready' && file.stamp ? [{ key: file.key, filePath: file.filePath, stamp: file.stamp }] : []
+      )
+    )
   }
 
   /** The view for a spelling (a document-relative path as classified). */
@@ -288,6 +227,7 @@ export class MarkdownImageStore {
     if (this.visible === visible) return
     this.visible = visible
     if (visible && this.pending) this.refresh()
+    this.syncFollow()
   }
 
   /**
@@ -322,6 +262,7 @@ export class MarkdownImageStore {
       if (this.subscribers === 0 && this.detach) {
         this.detach()
         this.detach = null
+        this.syncFollow()
       }
     }
   }
@@ -342,6 +283,8 @@ export class MarkdownImageStore {
     // A change event replaces any back-off: the refresh re-reads those files
     for (const file of this.files.values()) this.clearRetry(file)
     this.pending = true
+    // A followed file that was gone may be back: its tracker finds out
+    this.follower?.checkAll('manual')
     if (!this.visible) {
       this.clearSettle()
       return
@@ -349,7 +292,7 @@ export class MarkdownImageStore {
     const now = Date.now()
     this.burstStartedAt ??= now
     if (this.settleTimer) clearTimeout(this.settleTimer)
-    const wait = Math.min(MARKDOWN_IMAGE_SETTLE_MS, this.burstStartedAt + MARKDOWN_IMAGE_MAX_WAIT_MS - now)
+    const wait = Math.min(SETTLE_MS, this.burstStartedAt + MARKDOWN_IMAGE_MAX_WAIT_MS - now)
     this.settleTimer = setTimeout(() => this.refresh(), Math.max(0, wait))
   }
 
@@ -357,6 +300,11 @@ export class MarkdownImageStore {
     const offWatcher = this.deps.onDirectoryChanged(() => this.requestRefresh())
     const offOwn = this.deps.onFileStructureChanged(() => this.requestRefresh())
     const offBudget = this.deps.budget.onRelease(() => this.retryOverBudget())
+    this.follower ??= this.deps.follow({
+      read: (filePath) => this.deps.read({ filePath }),
+      refreshFile: (key, bytes) => this.refreshFile(key, bytes),
+      recheckFile: (key) => this.recheckFile(key)
+    })
     this.detach = () => {
       offWatcher()
       offOwn()
@@ -442,6 +390,7 @@ export class MarkdownImageStore {
     const held = file.bytes
     file.bytes = 0
     this.deps.budget.release(held)
+    this.syncFollow()
   }
 
   private notify(spelling: Spelling): void {
@@ -534,6 +483,11 @@ export class MarkdownImageStore {
       return
     }
 
+    await this.accept(file, response, isStale)
+  }
+
+  /** Take new bytes: budget, decode off the DOM, then show them (a failed decode keeps what is shown). */
+  private async accept(file: FileEntry, response: MarkdownImageBytes, isStale: () => boolean): Promise<void> {
     // Remembered whatever happens next, so the same bytes are not asked for
     // again – except when a shown image is kept over bytes that do not decode
     // (half-written): then its own version stays, so the re-try reads again
@@ -573,8 +527,10 @@ export class MarkdownImageStore {
 
     if (delta < 0) this.deps.budget.release(-delta)
     file.bytes = size
+    file.stamp = response.stamp
     this.clearRetry(file)
     this.setFileView(file, { status: 'ready', url: response.dataUrl })
+    this.syncFollow()
   }
 
   /**

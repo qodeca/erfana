@@ -8,9 +8,11 @@ Performance considerations, security measures, edge case handling, and integrati
 
 ### Debouncing Strategy
 
-**File Watcher**: Fixed 300ms delay
-- Optimized for individual file saves
-- Handles rapid successive writes (e.g., auto-save in external editor)
+**File Watcher**: a per-profile write-finish wait, no main-side debounce (#478). Figures are in `TIMING_PROFILES` (`src/shared/freshness/timingProfiles.ts`); the table is in the [README](./README.md#following-a-file-the-freshness-capability-478)
+- Editor and image tabs: the file's size must hold still for 75 ms (polled every 25 ms, at most 5 s), then the tab reads it – expected 130–200 ms from the end of a write to the new text, asserted at p50 ≤ 250 ms and p95 ≤ 400 ms
+- A burst is throttled in the tab, leading plus trailing at 250 ms: the first change is read at once, and the last version is always shown
+- HTML preview: a 50 ms wait plus the pool's 30 ms coalesce, unchanged by #478
+- Before #478 the wait was 300 ms plus a 300 ms debounce, about 0.7 s per change
 
 **Directory Watcher**: Fixed-stage pipeline (VS Code values), not an adaptive delay
 - chokidar runs with `awaitWriteFinish: false` (lower latency for editor saves); on Windows and macOS the native backend emits once its `lstat` classification is back, and folds lost events into one resync debounced to 1 s quiet / 5 s maximum wait (#211)
@@ -43,7 +45,7 @@ Log lines, and how to check from `main.log` that no two walks of a project overl
 
 ### Resource Limits
 
-- **File watcher**: 100 file limit (prevents memory issues)
+- **File watcher**: watch buckets, counted by file (a join of an already-watched file takes no slot): `tabs` 100 (editor and image, all windows), `preview` 16 per view and 64 in all, `dependent` 8 per owner group and 32 in all, `comments` 64 (`WATCH_BUCKETS`). A subscribe past a cap waits in a line of up to 200 per bucket; the editor refuses text above 10 MiB and hashes files only up to 16 MiB
 - **Directory watcher, chokidar (Linux)**: no handle limit of its own; excluded, hidden and ignored folders are never scanned
 - **Directory watcher, native backend (Windows #211, macOS)**: at most 512 `fs.watch` handles per project; 64 exclude path entries and 64 walk hints as split paths, each at most 16 segments deep; at most 2 `lstat` calls in flight and 10,000 queued paths; at most 3 re-opens of one path per 60 s
 - **Exclude list (#211)**: per settings file 256 entries and 4,096 characters; merged list 512 entries and 8,192 characters; per entry 256 characters, 8 wildcards, 4 `**` segments; 20,000 character comparisons per match, and pattern entries switch off for the rest of the project session after 100 overruns
@@ -117,19 +119,20 @@ A cloned repository's `.erfana/settings.json` is untrusted input, and its `files
 All IPC handler inputs are validated:
 
 ```typescript
-// file-watcher-handlers.ts
-registerHandle('file-watch:start', async (event, filePath: string) => {
-  try {
-    // Validate input
-    if (!filePath || typeof filePath !== 'string') {
-      throw new Error('Invalid file path')
-    }
-    await fileWatcherService.watchFile(filePath, event.sender)
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: getErrorMessage(error) } // logged first
-  }
-})
+// file-watcher-handlers.ts (#478): a strict request object, a trusted sender,
+// and the path confined to the open project before the service sees it
+registerConfinedHandle(
+  FILE_WATCH_CHANNELS.subscribe,
+  {
+    ...common,
+    schema: payloadArgs(SubscribeRequestSchema),
+    paths: { filePath: { arg: 0, key: 'filePath', mode: 'project', mustExist: true, kind: 'file' } },
+    senderGate: { allow: allowSender, denied: (): SubscribeReply => ({ status: 'refused', code: 'WATCH_FAILED' }) },
+    onRefusal: (error) => subscribeRefusal(error),
+    handler: async (ctx, [{ watchId, profile }], { filePath }) => { /* watcher.subscribe(…) */ }
+  },
+  session
+)
 ```
 
 ### Error Handling
@@ -147,10 +150,14 @@ registerHandle('file-watch:start', async (event, filePath: string) => {
 
 | Edge Case | Solution |
 |-----------|----------|
-| Race: Save vs external change | Pause/resume pattern during save |
-| Multiple tabs, same file | Single watcher, all tabs notified |
-| File deleted while open | Warning banner, keep editor state |
-| File recreated after delete | New watcher started automatically |
+| Race: Save vs external change | The save pauses its own subscription; a change during the save is delivered after it, and an autosave that finds the file changed writes nothing and shows the "Not saved" conflict |
+| Multiple tabs, same file | One native watcher, one subscription per tab; each tab hears a change, a pause or release touches only its own |
+| File deleted while open | Confirmed after 500 ms, then the deleted notice; the editor keeps its text |
+| File recreated after delete | The tracker finds it by probe (0.5 s backing off to 2 s), subscribes again with a new id and reads it |
+| Open while an agent writes | The watch answers after the native watcher is ready with a fresh stamp; a difference from what the tab read is caught up |
+| Path spelled differently (drive-letter case, 8.3 name, junction, symlink to an in-project file) | Watches are keyed by the real path, so the spellings share one watch |
+| Project open fails after tabs are open | Watchers were suspended just before the commit; the failure resumes them and every tab catches up |
+| Wake from sleep | Every watch is re-armed, then every tracker checks |
 
 ### Directory Watcher
 
@@ -180,10 +187,10 @@ registerHandle('file-watch:start', async (event, filePath: string) => {
 > Anything window-scoped added to this panel needs an active-panel gate - see
 > [keyboard shortcuts](../keyboard-shortcuts.md).
 
-- Starts file watcher when file is opened
-- Stops watcher when panel is unmounted
-- Shows conflict bar when needed
-- Implements pause/resume during save
+- Starts a tracker (`useFileWatcher` on `useFreshness`) once the file's first read is in; the subscription starts from that read's stamp
+- Disposes the tracker, and so unsubscribes, when the panel is unmounted
+- Shows the panel's one notice (conflict bar, deleted, content unavailable, stopped, queued, limited)
+- Saves through the save add-on, which pauses only this tab's subscription
 
 ### ProjectTree (Directory Watching)
 

@@ -79,6 +79,10 @@ function makeFakePool(deferRelease = false): FakePool {
     async close() {
       held.clear()
     },
+    state: () => undefined,
+    recheck() {
+      log.push('recheck')
+    },
     get size() {
       return held.size
     },
@@ -393,6 +397,66 @@ describe('createPreviewWatchCoordinator change coalescing', () => {
     expect(onChanged.mock.calls[0][0].sort()).toEqual(['/proj/a.css', '/proj/b.css'])
   })
 
+  it('V2: a watched sub-file deleted for now keeps its watch, and its coming back reloads the page', async () => {
+    const pool = makeFakePool()
+    const timer = makeTimerHarness()
+    const onChanged = vi.fn()
+    const gone = new Set<string>()
+    const coord = createPreviewWatchCoordinator({
+      realRoot: REAL_ROOT,
+      pool,
+      onChanged,
+      confine: async (_root, candidate) =>
+        gone.has(candidate)
+          ? { ok: false, reason: 'missing' }
+          : { ok: true, realTarget: candidate, rel: candidate },
+      setTimer: timer.setTimer,
+      clearTimer: timer.clearTimer
+    })
+    await coord.setWatchSet(['/proj/style.css', '/proj/app.js'])
+    pool.log.length = 0
+
+    // `git checkout` deletes style.css; the reload that delete caused re-scans the page
+    gone.add('/proj/style.css')
+    const result = await coord.setWatchSet(['/proj/style.css', '/proj/app.js'])
+
+    expect(result.watched).toEqual(['/proj/style.css', '/proj/app.js'])
+    expect(result.dropped).toEqual([])
+    expect(pool.log).not.toContain('release-start:/proj/style.css')
+
+    // The file is back: the pool tracker that kept watching reports it
+    gone.delete('/proj/style.css')
+    pool.callbacks.get('/proj/style.css')?.()
+    timer.run()
+    expect(onChanged).toHaveBeenCalledWith(['/proj/style.css'])
+  })
+
+  it('V2: a missing candidate that was never watched, or that now escapes, is dropped as before', async () => {
+    const pool = makeFakePool()
+    const verdicts = new Map<string, ConfineVerdict>([
+      ['/proj/broken.css', { ok: false, reason: 'missing' }]
+    ])
+    const coord = createPreviewWatchCoordinator({
+      realRoot: REAL_ROOT,
+      pool,
+      onChanged: () => {},
+      confine: async (_root, candidate) =>
+        verdicts.get(candidate) ?? { ok: true, realTarget: candidate, rel: candidate }
+    })
+    await coord.setWatchSet(['/proj/broken.css', '/proj/a.css'])
+    verdicts.set('/proj/a.css', { ok: false, reason: 'escape' })
+
+    const result = await coord.setWatchSet(['/proj/broken.css', '/proj/a.css'])
+
+    expect(result.watched).toEqual([])
+    expect(result.dropped).toEqual([
+      { candidate: '/proj/broken.css', reason: 'out-of-root' },
+      { candidate: '/proj/a.css', reason: 'out-of-root' }
+    ])
+    expect(pool.log).toContain('release-start:/proj/a.css')
+    expect(pool.log).not.toContain('acquire:/proj/broken.css')
+  })
+
   it('starts a fresh window for the next burst', async () => {
     const pool = makeFakePool()
     const timer = makeTimerHarness()
@@ -440,5 +504,17 @@ describe('createPreviewWatchCoordinator change coalescing', () => {
     // A late timer run after dispose emits nothing.
     timer.run()
     expect(onChanged).not.toHaveBeenCalled()
+  })
+})
+
+describe('createPreviewWatchCoordinator.recheck (#478 S17, S1)', () => {
+  it('asks the pool to compare every watched file, and does nothing once disposed', async () => {
+    const pool = makeFakePool()
+    const coordinator = createPreviewWatchCoordinator({ realRoot: REAL_ROOT, pool, onChanged: vi.fn(), confine: makeConfine() })
+    coordinator.recheck()
+    expect(pool.log).toEqual(['recheck'])
+    await coordinator.dispose()
+    coordinator.recheck()
+    expect(pool.log.filter((entry) => entry === 'recheck')).toHaveLength(1)
   })
 })

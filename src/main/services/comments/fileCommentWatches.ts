@@ -2,37 +2,42 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The file watches behind `file-comment:changed` (spec 024 architecture note
- * 001 § 8 C18; 024-NFR-005 item 6).
+ * 001 § 8 C18; 024-NFR-005 item 6; #478 C4).
  *
  * One watch per real path, whatever number of panels and windows listed it:
  * each panel is a subscriber, and the watch closes when its last subscriber
  * leaves (the panel lists another file, its window closes, the project
- * changes). Watches are counted and capped at {@link FILE_COMMENT_WATCHES_MAX}
- * for the whole process: past the cap a list is still answered, only without
- * live updates, and that is logged (path digest only).
+ * changes).
+ *
+ * Each watch is a freshness tracker on the one watch layer (#478 plan S19,
+ * `freshness/mainTrackedWatch.ts`, `comments` profile), so it draws from the
+ * `comments` bucket (64 files, every window together), and the layer suspends
+ * and restores it across a project switch, re-arms it after a wake and
+ * re-checks it in its health round (F2). A watch that ends is restarted once
+ * and caught up; a write that landed meanwhile is a change, so the drawer
+ * lists the file again. Past the bucket a watch is queued, not refused: the
+ * file is listed at once and follows live as soon as a slot frees, and until
+ * then window focus checks it (the safety net) – that is logged by digest only.
  *
  * Who is told about a change is the service's business – it sends to the
  * subscribers' own windows only.
  */
 import { stablePathDigest } from '../../../shared/stablePathDigest'
-import { createRearmingSingleFileWatcher } from '../watcher/rearmingSingleFileWatch'
+import { createTrackedFileWatch, type TrackedWatchProblem } from '../freshness/mainTrackedWatch'
 import { logger } from '../LoggingService'
-
-/** Files watched at once for comments, every window together. */
-export const FILE_COMMENT_WATCHES_MAX = 64
 
 /** What closing a watch takes. */
 export interface FileCommentWatchHandle {
   close(): Promise<void>
 }
 
-/** Start watching `realPath`; `onChange` runs on every change, an atomic save's re-arm included. */
+/** Start watching `realPath`; `onChange` runs on every change, an atomic save's re-arm and a delete included. */
 export type FileCommentWatchFactory = (realPath: string, onChange: () => void) => FileCommentWatchHandle
 
 /** The process-wide set of comment file watches. */
 export interface FileCommentWatches {
-  /** Add `subscriber` to `realPath`'s watch, starting it if needed; `false` when the cap left no room. */
-  subscribe(realPath: string, subscriber: string): boolean
+  /** Add `subscriber` to `realPath`'s watch, starting it if needed. */
+  subscribe(realPath: string, subscriber: string): void
   /** Remove `subscriber`; the watch closes with its last one. */
   unsubscribe(realPath: string, subscriber: string): void
   /** Watches open now. */
@@ -51,26 +56,38 @@ function closeQuietly(handle: FileCommentWatchHandle): Promise<void> {
   return handle.close().catch(() => {})
 }
 
+/** What a comment watch says about itself in the log; the file by digest only (C20). */
+function logProblem(realPath: string, problem: TrackedWatchProblem): void {
+  const file = stablePathDigest(realPath)
+  if (problem === 'queued') {
+    logger.warn('File comments: the watch limit is reached; the file follows live once a slot frees', { file })
+    return
+  }
+  if (problem === 'limited') {
+    // A network or WSL volume: the focus and resume checks still cover it (G7)
+    logger.info('File comments: live refresh is limited on this volume; checks still run', { file })
+    return
+  }
+  logger.warn('File comments: the file is no longer followed live', { file, problem })
+}
+
+/** The production watch: a freshness tracker on the shared watch layer. */
+export const defaultFileCommentWatch: FileCommentWatchFactory = (realPath, onChange) =>
+  createTrackedFileWatch(
+    realPath,
+    { onChange, onDeleted: onChange, onProblem: (problem) => logProblem(realPath, problem) },
+    { profile: 'comments' }
+  )
+
 /**
  * Build the set.
  *
  * @param onChange - Told the real path whose file changed.
  */
-/** The production watch: one atomic-save-proof watcher per file. */
-export const defaultFileCommentWatch: FileCommentWatchFactory = (realPath, onChange) =>
-  createRearmingSingleFileWatcher(realPath, {
-    onChange,
-    onDeleted: onChange,
-    onError: () => {},
-    onWatchDead: () => {}
-  })
-
 export function createFileCommentWatches(deps: {
   readonly watch: FileCommentWatchFactory
   readonly onChange: (realPath: string) => void
-  readonly max?: number
 }): FileCommentWatches {
-  const max = deps.max ?? FILE_COMMENT_WATCHES_MAX
   const watches = new Map<string, Watch>()
 
   return {
@@ -78,18 +95,10 @@ export function createFileCommentWatches(deps: {
       const known = watches.get(realPath)
       if (known !== undefined) {
         known.subscribers.add(subscriber)
-        return true
-      }
-      if (watches.size >= max) {
-        logger.warn('File comments: the watch cap is reached; the file is listed without live updates', {
-          watches: watches.size,
-          file: stablePathDigest(realPath)
-        })
-        return false
+        return
       }
       const handle = deps.watch(realPath, () => deps.onChange(realPath))
       watches.set(realPath, { handle, subscribers: new Set([subscriber]) })
-      return true
     },
     unsubscribe(realPath, subscriber) {
       const watch = watches.get(realPath)

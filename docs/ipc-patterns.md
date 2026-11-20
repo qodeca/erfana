@@ -23,7 +23,7 @@ registerHandle('file:readFile', async (_event, request: unknown) => {
 })
 ```
 
-New channels take **one request object**, validated by a Zod schema in `src/shared/ipc/*-schema.ts`. Every `file:*` channel does this with a strict schema (`z.strictObject`): a key the schema does not list is refused, not ignored, and positional arguments are refused. The `file:*` channels with a path register through `registerConfinedHandle` (see [Path checks in the main process](#path-checks-in-the-main-process)), whose `schema` is `payloadArgs(SomeRequestSchema)` and whose `paths` name the request key that holds each path (`{ arg: 0, key: 'filePath', mode: 'project' }`). Older domains still take positional arguments – `file-watch:*`, `directory-watch:*`, `git:*`, `git-watcher:*`, `git-polling:*`, `settings:*`, `import:validate` / `process` / `isSupported`, and the terminal-id channels (`terminal:kill`, `getInfo`, `getActivity`, `isAvailable`, which take a bare `terminalId`). Do not copy that shape into a new channel.
+New channels take **one request object**, validated by a Zod schema in `src/shared/ipc/*-schema.ts`. Every `file:*` channel does this with a strict schema (`z.strictObject`): a key the schema does not list is refused, not ignored, and positional arguments are refused. The `file:*` channels with a path register through `registerConfinedHandle` (see [Path checks in the main process](#path-checks-in-the-main-process)), whose `schema` is `payloadArgs(SomeRequestSchema)` and whose `paths` name the request key that holds each path (`{ arg: 0, key: 'filePath', mode: 'project' }`). Older domains still take positional arguments – `directory-watch:*`, `git:*`, `git-watcher:*`, `git-polling:*`, `settings:*`, `import:validate` / `process` / `isSupported`, and the terminal-id channels (`terminal:kill`, `getInfo`, `getActivity`, `isAvailable`, which take a bare `terminalId`). Do not copy that shape into a new channel.
 Never call `ipcMain.handle(...)` or `ipcMain.on(...)` yourself. `src/main/ipc/registry.ts` (`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`, paired with `unregisterHandle` / `unregisterOn`) is the **only** place a global handler is registered, and every listener it registers is gated on the app's own top-level renderer (`isTrustedAppSender`, `src/main/ipc/senderValidation.ts`) before the payload is seen – an untrusted `invoke` rejects, an untrusted `send` is dropped and logged by origin. Importing `ipcMain` anywhere else under `src/main/**` is an ESLint error (`no-restricted-imports` in `eslint.config.mjs`), so the gate cannot be skipped by forgetting it. Frame-scoped listeners (`webContents.ipc`, `webContents.mainFrame.ipc`) are deliberately outside the registry; they carry their own per-call token or frame check. Why an explicit entry point rather than a wrapped `ipcMain`: see the header of `registry.ts` and [Security § Sender-frame gating](./security.md#sender-frame-gating).
 
 **3. Call from renderer**, through the bridge's gateway (see [Renderer gateways](#renderer-gateways)):
@@ -211,7 +211,7 @@ Note that several domains register through channel **constants**
 | `file:findByName` | Files of one name in the project: `dirPath` must be the project root (confined like a tree read; the real root is walked, results use the requested spelling). Bounded – 20 results, 20,000 folders, 16 reads in flight, a hard 1.5 s deadline; at most 2 searches per process with reads in flight (a search keeps its slot until its last read settles, so hung reads stay bounded), one per session + root + spelling + name, 8 waiting for at most 1.5 s, the rest answer `truncated` – and never through a link; skips hidden, excluded and ignored folders; a project switch ends it. The terminal's file links call it on a click when the tree is incomplete (finding [32]) |
 | `file:readFile` | Read file content. Request `{ filePath }`; must be a file inside the project |
 | `file:readImage` | Read an image as a base64 data URL, or answer `unchanged` when the caller's version still matches (#70) |
-| `file:writeFile` | Write file content. Request `{ filePath, content, createParentDirs?, generation? }`: `createParentDirs` (literal `true` only) recreates missing folders inside the project for the editor's "Save to restore it"; `generation` is the project session generation the file was opened under, and a write is refused with `PROJECT_CHANGED` (before anything is touched) when the open project is a different one |
+| `file:writeFile` | Write file content. Request `{ filePath, content, createParentDirs?, generation? }`: `createParentDirs` (literal `true` only) recreates missing folders inside the project for a deleted tab's manual restore (the editor itself now writes through `file-watch:writeText`, #478); `generation` is the project session generation the file was opened under, and a write is refused with `PROJECT_CHANGED` (before anything is touched) when the open project is a different one |
 | `file:getStats` | Get file metadata |
 | `file:exists` | Existence check |
 | `file:createFile` | Create new empty file. Request `{ dirPath, name }` |
@@ -244,15 +244,16 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 
 | Channel | Purpose |
 |---------|---------|
-| `file-watch:start` | Start watching a file for changes |
-| `file-watch:stop` | Stop watching a file |
-| `file-watch:stopAll` | Stop every single-file watch |
-| `file-watch:pause` | Pause watching (during save) |
-| `file-watch:resume` | Resume watching after save |
+| `file-watch:subscribe` | Start following a file. Request `{ watchId, filePath, profile }`; answers `started`, `queued` or `refused` with a code (#478) |
+| `file-watch:unsubscribe` | Stop one subscription. Request `{ watchId }` |
+| `file-watch:pauseWatch` | Pause one subscription around an own save (ends by itself after `pauseMaxMs`) |
+| `file-watch:resumeWatch` | Resume it; answers `{ success, missed }` |
+| `file-watch:probe` | Is the file still the version named? Request `{ filePath, knownHash? }` |
+| `file-watch:readText` | The classified text read. Request `{ filePath }` |
+| `file-watch:writeText` | The checked text write. Request `{ filePath, content, expectedStamp?, generation?, createParentDirs? }` |
 | `file-watch:stats` | Diagnostics: active watch counts |
-| `file-watch:changed` | Event: file changed externally |
-| `file-watch:deleted` | Event: file deleted externally |
-| `file-watch:error` | Event: watcher error |
+| `file-watch:event` | Event for one subscription, to its window only: `changed`, `deleted`, `started`, `restarted`, `ended`. A `changed` with `forced: true` did not wait for the writes to settle (the write gate's 5 s cap, or the health round re-arming a file that was replaced unheard), so the tracker settles before it reads. A plain `changed` from the write gate carries `stamp`, the stat-only stamp the writes settled at: the tracker reads at once, but a read that does not find the file at that stamp (a new writer started before the event reached the tab) settles first. The re-arm after an atomic save sends a plain `changed`, read at once (a known limit – [file-watching guide](file-watching/README.md)) |
+| `file-watch:check` | Event: check every tracker now (power resume) |
 
 ### Directory watching (`directory-watcher-handlers.ts`)
 
@@ -484,7 +485,7 @@ Comments in a preview the renderer draws itself (the Markdown preview first), se
 
 | Channel | Purpose |
 |---------|---------|
-| `markdown-image:read` | Read an image a Markdown document references. Request `{ filePath, knownVersion? }` (strict). Sender-gated with `isTrustedSender` before the payload is read, then confined to the open project: a path not lexically inside the root is refused before the file system is asked (`lexicalPrecheck`), then `project` mode with links resolved, must be an existing file. PNG / JPEG / GIF / WebP / SVG only – the requested and the canonical path must both carry one of those extensions. The file is opened once (non-blocking, last segment not followed, on POSIX), must be a regular file by `fstat` of that handle, and at most `MARKDOWN_IMAGE_MAX_BYTES` (16 MB) + 1 bytes are read. Answers `ok` (`data:` URL + version), `unchanged`, or `refused` with a reason (`outside-project`, `not-found`, `unsupported-type`, `too-large`, `unreadable`); never rejects for a refusal and never names a path. Refusals log at debug (`refusalLogLevel`) |
+| `markdown-image:read` | Read an image a Markdown document references. Request `{ filePath, knownVersion? }` (strict). Sender-gated with `isTrustedSender` before the payload is read, then confined to the open project: a path not lexically inside the root is refused before the file system is asked (`lexicalPrecheck`; on Windows a local drive-letter path whose 8.3 short-name segments spell the project folder is first expanded with `realpath` on a drive the project lives on – never a UNC or device path), then `project` mode with links resolved, must be an existing file. PNG / JPEG / GIF / WebP / SVG only – the requested and the canonical path must both carry one of those extensions. The file is opened once (non-blocking, last segment not followed, on POSIX), must be a regular file by `fstat` of that handle, and at most `MARKDOWN_IMAGE_MAX_BYTES` (16 MB) + 1 bytes are read. Answers `ok` (`data:` URL + version), `unchanged`, or `refused` with a reason (`outside-project`, `not-found`, `unsupported-type`, `too-large`, `unreadable`); never rejects for a refusal and never names a path. Refusals log at debug (`refusalLogLevel`) |
 
 ### Open in default browser (`browser-handlers.ts`, constants in `browser-channels.ts`) (#124)
 
@@ -652,7 +653,7 @@ This pattern avoids stale updates from previous switches.
 
 Applied in services:
 - Project session: `ProjectSession.generation` (`src/main/services/session/ProjectSession.ts`) is the one app-wide counter. The renderer carries it on tree reads, writes and closes, and main refuses stale ones (see [Project generation](#path-checks-in-the-main-process))
-- File watcher: src/main/services/FileWatcherService.ts (`switchVersion` guards change/delete/notify)
+- File watcher: src/main/services/FileWatcherService.ts (each subscription records the session generation; a stale one is refused before its answer, and a project switch ends older ones – #478)
 - Directory watcher: src/main/services/DirectoryWatcherService.ts and its layers in src/main/services/watcher/ (`DirectoryWatcherEvents.ts`, `DirectoryWatcherCore.ts`; `switchVersion` guards queue/process/notify)
 
 ### Preview channels not in this index (sd-074b)

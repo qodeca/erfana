@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { app, BrowserWindow, Menu, dialog, session } from 'electron'
+import { app, BrowserWindow, Menu, dialog, session, powerMonitor } from 'electron'
 import { join } from 'path'
 import { APP_ID } from '../shared/constants'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,6 +8,7 @@ import { spawnNewInstance } from './utils/spawnNewInstance'
 import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
 import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
+import { wirePowerResume, wireWatchOwner } from './services/freshness/watchOwnerLifecycle'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
@@ -323,6 +324,8 @@ function createWindow(): BrowserWindow {
   mainWindow.on('will-resize', () => previewHandlers?.setResizeHold(previewWindowId, true))
   mainWindow.on('resized', () => previewHandlers?.setResizeHold(previewWindowId, false))
 
+  // File watches end with the page that holds them: on a navigation or reload, and on destroy (#478 G2)
+  wireWatchOwner(mainWindow.webContents, fileWatcherService)
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
@@ -335,13 +338,6 @@ function createWindow(): BrowserWindow {
       .catch((err) => {
         logger.error('Error closing project', redactedLogError(err))
       })
-
-    // Cleanup watcher services asynchronously
-    // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
-    // Errors are logged but don't halt further cleanup operations
-    fileWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
-      logger.error('Error cleaning up file watchers', err instanceof Error ? err : undefined)
-    })
 
     directoryWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
       logger.error('Error cleaning up directory watchers', err instanceof Error ? err : undefined)
@@ -500,6 +496,8 @@ app.whenReady().then(async () => {
       .catch((error: unknown) => logger.error('Re-checking open files failed', redactedLogError(error)))
   })
   fileWatcherService.watchUnseenFiles(directoryWatcherService)
+  // A watcher can die silently in sleep: re-arm every watch on wake (#478 G8)
+  wirePowerResume(powerMonitor, fileWatcherService)
 
   // Register IPC handlers. Every global channel is gated on the app's own
   // top-level renderer by construction: the handlers register through
@@ -507,7 +505,7 @@ app.whenReady().then(async () => {
   // imported anywhere else (sd-074b §7). There is no install step to forget and
   // no ordering to get wrong.
   registerFileHandlers()
-  registerFileWatcherHandlers()
+  registerFileWatcherHandlers(projectService.session)
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
   registerTerminalHandlers(projectService.session)

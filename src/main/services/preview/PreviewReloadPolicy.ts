@@ -18,15 +18,16 @@
  * swap before running it (issue #124, WI-15; `previewLivePipeline.ts`).
  *
  * The classifier is pure. The coalescer buffers rapid `change` events over a
- * short window (default `PREVIEW.WATCH_COALESCE_MS`) into one decision, so an
- * editor's save-storm collapses to a single swap/reload. Timer functions are
+ * short window (default: the `preview` timing profile's `poolCoalesceMs`)
+ * into one decision, so an editor's save-storm collapses to a single
+ * swap/reload. Timer functions are
  * injectable so the coalescer is testable without wall-clock waits or global
  * fake timers.
  *
  * Files are DATA: a changed path only classifies a decision, it is never
  * executed here.
  */
-import { PREVIEW } from '../../../shared/constants'
+import { TIMING_PROFILES } from '../../../shared/freshness/timingProfiles'
 
 /** The extension that qualifies a single-file change for an in-place swap. */
 const CSS_EXTENSION = '.css'
@@ -84,7 +85,7 @@ export interface IPreviewReloadPolicy {
 export interface PreviewReloadPolicyOptions {
   /** Called once per coalesced burst with the classified decision. */
   readonly onDecision: (decision: ReloadDecision) => void
-  /** Coalesce window in ms; defaults to `PREVIEW.WATCH_COALESCE_MS`. */
+  /** Coalesce window in ms; defaults to the `preview` timing profile's `poolCoalesceMs`. */
   readonly coalesceMs?: number
   /** Timer scheduler; defaults to the global `setTimeout`. Injected for tests. */
   readonly setTimer?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>
@@ -99,7 +100,7 @@ export interface PreviewReloadPolicyOptions {
 export function createPreviewReloadPolicy(
   options: PreviewReloadPolicyOptions
 ): IPreviewReloadPolicy {
-  const coalesceMs = options.coalesceMs ?? PREVIEW.WATCH_COALESCE_MS
+  const coalesceMs = options.coalesceMs ?? TIMING_PROFILES.preview.poolCoalesceMs
   const setTimer = options.setTimer ?? setTimeout
   const clearTimer = options.clearTimer ?? clearTimeout
 

@@ -23,7 +23,11 @@
  *   is still refused.
  *
  * The version token is the same as the viewer's (`formatVersion`), minted from
- * the `fstat` taken before the read.
+ * the `fstat` taken before the read, so it carries the change time too (#478
+ * L4). Every answer also carries the stamp of that `fstat` (#478 plan S18):
+ * what the Markdown preview's per-image tracker compares a check against.
+ * Bytes that moved during the read keep the stamp from before it, so the next
+ * check sees a difference and reads again.
  *
  * @module services/file/readDocumentImage
  */
@@ -32,15 +36,11 @@ import { open } from 'fs/promises'
 import { extname } from 'path'
 import type { ImageReadResponse } from '../../../shared/ipc/file-image-schema'
 import { getImageMimeType } from '../../../shared/ipc/image-formats'
-import { formatVersion, ImageTooLargeError } from './imageRead'
+import { stampFromStats } from '../freshness/stampStats'
+import { formatVersion, ImageTooLargeError, NotARegularFileError } from './imageRead'
 
-/** The opened path is not a regular file (a folder, FIFO, socket or device). */
-export class NotARegularFileError extends Error {
-  constructor() {
-    super('Not a regular file')
-    this.name = 'NotARegularFileError'
-  }
-}
+// Declared in `imageRead` since #478 (the viewer refuses non-regular files too); re-exported for existing importers
+export { NotARegularFileError }
 
 /** Read size after the first, `fstat`-sized, read. */
 const CHUNK_BYTES = 64 * 1024
@@ -72,7 +72,8 @@ export async function readDocumentImage(
     if (size > maxBytes) throw tooLarge()
 
     const version = formatVersion(stats)
-    if (knownVersion !== undefined && knownVersion === version) return { status: 'unchanged', version }
+    const stamp = stampFromStats(stats)
+    if (knownVersion !== undefined && knownVersion === version) return { status: 'unchanged', version, stamp }
 
     const chunks: Buffer[] = []
     let total = 0
@@ -88,7 +89,7 @@ export async function readDocumentImage(
 
     const mimeType = getImageMimeType(extname(filePath)) ?? 'application/octet-stream'
     const bytes = Buffer.concat(chunks, total)
-    return { status: 'ok', dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`, version }
+    return { status: 'ok', dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`, version, stamp }
   } finally {
     await handle.close()
   }

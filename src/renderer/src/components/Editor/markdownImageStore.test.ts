@@ -17,10 +17,15 @@ import {
   MARKDOWN_IMAGE_RELEASE_GRACE_MS,
   MARKDOWN_IMAGE_RETRY_FIRST_MS,
   MARKDOWN_IMAGE_RETRY_WINDOW_MS,
-  MARKDOWN_IMAGE_SETTLE_MS,
-  ImageByteBudget,
-  MarkdownImageStore
+  MarkdownImageStore,
+  type MarkdownImageStoreDeps
 } from './markdownImageStore'
+import type { FollowedImage, MarkdownImageFollower, MarkdownImageFreshnessHost } from './markdownImageFreshness'
+import { ImageByteBudget } from './markdownImageBudget'
+import { TIMING_PROFILES } from '../../../../shared/freshness/timingProfiles'
+
+/** The settle after a change signal: the `dependent` profile's (#478 S18). */
+const MARKDOWN_IMAGE_SETTLE_MS = TIMING_PROFILES.dependent.settleMs
 
 vi.mock('../../utils/logger', () => ({
   logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn() }
@@ -38,7 +43,8 @@ class FakeDisk {
     if (!file) return { status: 'refused', reason: 'not-found' }
     const version = String(file.version)
     if (request.knownVersion === version) return { status: 'unchanged', version }
-    return { status: 'ok', dataUrl: `data:image/png;base64,${file.label}`, version }
+    const stamp = { size: file.label.length, mtimeMs: file.version, ctimeMs: file.version, ino: request.filePath }
+    return { status: 'ok', dataUrl: `data:image/png;base64,${file.label}`, version, stamp }
   })
 }
 
@@ -48,8 +54,13 @@ let ownListeners: Set<() => void>
 let decode: Mock
 let budget: ImageByteBudget
 
-function makeStore(documentPath = '/p/docs/doc.md', platform: NodeJS.Platform = 'darwin'): MarkdownImageStore {
+function makeStore(
+  documentPath = '/p/docs/doc.md',
+  platform: NodeJS.Platform = 'darwin',
+  follow?: MarkdownImageStoreDeps['follow']
+): MarkdownImageStore {
   const store = new MarkdownImageStore({
+    ...(follow ? { follow } : {}),
     read: disk.read,
     getProjectPath: async () => '/p',
     decode,
@@ -578,5 +589,78 @@ describe('MarkdownImageStore – a shown image survives a passing failure', () =
     await flush(MARKDOWN_IMAGE_SETTLE_MS)
     expect(store.getView('./a.png')).toEqual({ status: 'unavailable', reason: 'not-found' })
     expect(store.getView('./b.png')).toEqual({ status: 'unavailable', reason: 'outside-project' })
+  })
+})
+
+describe('MarkdownImageStore – the live follow (#478 S18)', () => {
+  function recordingFollow() {
+    const syncs: FollowedImage[][] = []
+    const checks: string[] = []
+    let host: MarkdownImageFreshnessHost | null = null
+    const follower: MarkdownImageFollower = {
+      sync: (files) => syncs.push([...files]),
+      checkAll: (reason) => checks.push(reason),
+      dispose: () => {}
+    }
+    return {
+      syncs,
+      checks,
+      host: () => host as MarkdownImageFreshnessHost,
+      follow: (made: MarkdownImageFreshnessHost) => {
+        host = made
+        return follower
+      }
+    }
+  }
+
+  it('follows the shown files, with the stamp of the bytes shown, and nothing while hidden', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const rec = recordingFollow()
+    const store = makeStore(undefined, undefined, rec.follow)
+    store.subscribe('./a.png', vi.fn())
+    await flush()
+    expect(rec.syncs.at(-1)).toEqual([
+      { key: '/p/docs/a.png', filePath: '/p/docs/a.png', stamp: expect.objectContaining({ ino: '/p/docs/a.png' }) }
+    ])
+    store.setVisible(false)
+    expect(rec.syncs.at(-1)).toEqual([])
+  })
+
+  it('shows bytes the follow read, without reading them again', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const rec = recordingFollow()
+    const store = makeStore(undefined, undefined, rec.follow)
+    store.subscribe('./a.png', vi.fn())
+    await flush()
+    disk.read.mockClear()
+
+    rec.host().refreshFile('/p/docs/a.png', { status: 'ok', dataUrl: 'data:image/png;base64,A2', version: '2' })
+    await flush()
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A2' })
+    expect(disk.read).not.toHaveBeenCalled()
+  })
+
+  it('keeps the directory-signal refresh as the fallback past the follow, and asks the follow to check', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const rec = recordingFollow()
+    const store = makeStore(undefined, undefined, rec.follow)
+    store.subscribe('./a.png', vi.fn())
+    await flush()
+
+    disk.write('/p/docs/a.png', 'A2')
+    directoryChanged()
+    expect(rec.checks).toEqual(['manual'])
+    await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A2' })
+  })
+
+  it('stops following once no element shows an image', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const rec = recordingFollow()
+    const store = makeStore(undefined, undefined, rec.follow)
+    const unsubscribe = store.subscribe('./a.png', vi.fn())
+    await flush()
+    unsubscribe()
+    expect(rec.syncs.at(-1)).toEqual([])
   })
 })

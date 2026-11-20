@@ -298,7 +298,12 @@ export const PreviewFailureSchema = z
       'frame-excluded',
       'frame-too-deep',
       'frame-over-limit',
-      'frame-link-blocked'
+      'frame-link-blocked',
+      // The page's own file watch (#478, plan § 3.6)
+      'auto-refresh-stopped',
+      'watch-limit',
+      'file-unreadable',
+      'live-refresh-limited'
     ]),
     // Page-influenced value. The `record()` producer strips control chars; this
     // regex is the emit-time tripwire that actually enforces "no CR/LF", so a

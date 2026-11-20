@@ -275,11 +275,12 @@
       "id": "docs-architecture.md/14",
       "audience": "developer",
       "doc": "docs/architecture.md",
-      "quote": "FileWatcherService: Auto-reload files on external changes (300ms debounce)",
-      "status": "verified",
+      "quote": "FileWatcherService: Auto-reload files on external changes (75 ms write-finish wait for an editor tab, no extra debounce)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:31",
-      "match": "DEBOUNCE_DELAY = 300"
+      "source": "src/shared/freshness/timingProfiles.ts:86",
+      "match": "settleMs: 75,",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-architecture.md/15",
@@ -867,7 +868,7 @@
       "quote": "at most `MARKDOWN_IMAGE_MAX_BYTES` (16 MB) + 1 bytes are read",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/markdown-image-schema.ts:51",
+      "source": "src/shared/ipc/markdown-image-schema.ts:52",
       "match": "MARKDOWN_IMAGE_MAX_BYTES = 16 * 1024 * 1024"
     },
     {
@@ -957,18 +958,19 @@
       "quote": "`quit:requested` | Event: main asks the renderer to confirm a quit (`{ reason: 'close' }`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:249",
+      "source": "src/main/index.ts:250",
       "match": "send('quit:requested', { reason: 'close' })"
     },
     {
       "id": "docs-ipc-patterns.md/42",
       "audience": "developer",
       "doc": "docs/ipc-patterns.md",
-      "quote": "File watcher: src/main/services/FileWatcherService.ts (`switchVersion` guards change/delete/notify)",
-      "status": "verified",
+      "quote": "File watcher: src/main/services/FileWatcherService.ts (each subscription records the session generation; a stale one is refused before its answer, and a project switch ends older ones – #478)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:36",
-      "match": "private switchVersion = 0"
+      "source": "src/main/services/FileWatcherService.ts:209",
+      "match": "if (sub.generation !== this.generation()) return 'PROJECT_CHANGED'",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-api-services.md/01",
@@ -1035,21 +1037,23 @@
       "id": "docs-api-services.md/07",
       "audience": "developer",
       "doc": "docs/api-services.md",
-      "quote": "`MAX_WATCHED_FILES` (100) governs **new** entries only",
-      "status": "verified",
+      "quote": "The `tabs` bucket cap (100, `WATCH_BUCKETS` in `src/shared/freshness/timingProfiles.ts`) governs **new** watched files only",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:32",
-      "match": "MAX_WATCHED_FILES = 100"
+      "source": "src/shared/freshness/timingProfiles.ts:30",
+      "match": "tabs: { perOwnerCap: null, totalCap: 100 }",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-api-services.md/08",
       "audience": "developer",
       "doc": "docs/api-services.md",
-      "quote": "after `awaitWriteFinish` (300 ms) + a 300 ms debounce",
-      "status": "verified",
+      "quote": "once the write has finished (the profile's write-finish wait)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/watcher/singleFileWatch.ts:38",
-      "match": "stabilityThreshold: 300"
+      "source": "src/shared/freshness/timingProfiles.ts:86",
+      "match": "settleMs: 75,",
+      "note": "Reworded by #478: main no longer debounces (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-api-services.md/09",
@@ -1058,7 +1062,7 @@
       "quote": "after the 100 ms atomic-save window closes",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/AtomicSaveDetector.ts:35",
+      "source": "src/main/services/watcher/AtomicSaveDetector.ts:41",
       "match": "ATOMIC_SAVE_DELAY_MS = 100"
     },
     {
@@ -1088,7 +1092,7 @@
       "quote": "**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:489",
+      "source": "src/shared/constants.ts:490",
       "match": "SAFETY_TIMEOUT_MS: 10_000"
     },
     {
@@ -1209,7 +1213,7 @@
       "quote": "Each I/O step of a transition has a 15 s limit (`TRANSITION_STEP_TIMEOUT_MS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:78",
+      "source": "src/main/services/ProjectService.ts:79",
       "match": "TRANSITION_STEP_TIMEOUT_MS = 15_000"
     },
     {
@@ -1219,7 +1223,7 @@
       "quote": "Every open, switch and close runs on one queue (`serialise`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:203",
+      "source": "src/main/services/ProjectService.ts:208",
       "match": "private serialise<T>("
     },
     {
@@ -1229,7 +1233,7 @@
       "quote": "Get the recent-projects list (max 5), newest first.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:24",
+      "source": "src/shared/constants.ts:25",
       "match": "MAX_RECENT_PROJECTS = 5"
     },
     {
@@ -1441,7 +1445,7 @@
       "quote": "Opens circuit after 3 crashes within 60 seconds",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:467",
+      "source": "src/shared/constants.ts:468",
       "match": "CIRCUIT_BREAKER_THRESHOLD: 3,"
     },
     {
@@ -1451,7 +1455,7 @@
       "quote": "Half-open state after 5 minutes (allows a single probe request)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:471",
+      "source": "src/shared/constants.ts:472",
       "match": "CIRCUIT_BREAKER_RESET: 5 * 60 * 1000,"
     },
     {
@@ -1603,7 +1607,7 @@
       "quote": "Captures saved to OS temp directory as PNG (`erfana-screenshot-{timestamp}.png`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:277",
+      "source": "src/shared/constants.ts:278",
       "match": "TEMP_PREFIX: 'erfana-screenshot-',"
     },
     {
@@ -1613,7 +1617,7 @@
       "quote": "Native screencapture: 30 s timeout; cross-platform overlay: 60 s timeout",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:285",
+      "source": "src/shared/constants.ts:286",
       "match": "OVERLAY_TIMEOUT_MS: 60_000"
     },
     {
@@ -1683,7 +1687,7 @@
       "quote": "`erfana-camera-YYYY-MM-DD-HHMMSS.jpg` (`CAMERA.TEMP_PREFIX` + `CAMERA.FILE_EXTENSION`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:322",
+      "source": "src/shared/constants.ts:323",
       "match": "TEMP_PREFIX: 'erfana-camera-',"
     },
     {
@@ -1764,7 +1768,7 @@
       "quote": "GPT-4o-transcribe primary model, Whisper-1 fallback on 404",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:360",
+      "source": "src/shared/constants.ts:361",
       "match": "PRIMARY_MODEL: 'gpt-4o-transcribe',"
     },
     {
@@ -1774,7 +1778,7 @@
       "quote": "File chunking for files >8 minutes (480s boundary, 0.5s overlap)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:344",
+      "source": "src/shared/constants.ts:345",
       "match": "CHUNK_BOUNDARY_SECONDS: 8 * 60,"
     },
     {
@@ -1784,7 +1788,7 @@
       "quote": "Exponential backoff retry (max 3 attempts, 1s–30s delay)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:348",
+      "source": "src/shared/constants.ts:349",
       "match": "MAX_RETRY_ATTEMPTS: 3,"
     },
     {
@@ -2027,7 +2031,7 @@
       "quote": "Supports MP4, MOV, AVI, MKV, WebM, FLV, WMV video formats",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:415",
+      "source": "src/shared/constants.ts:416",
       "match": "SUPPORTED_EXTENSIONS: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'],"
     },
     {
@@ -2087,7 +2091,7 @@
       "quote": "rejects files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) with `IMPORT_EXCEEDS_SIZE_LIMIT`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:115",
+      "source": "src/shared/constants.ts:116",
       "match": "SIZE_HARD_LIMIT: 250 * BYTES_PER_MB,"
     },
     {
@@ -2237,7 +2241,7 @@
       "quote": "`DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS` (3 s)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:447",
+      "source": "src/shared/constants.ts:448",
       "match": "TOOL_RECHECK_MIN_INTERVAL_MS: 3000,"
     },
     {
@@ -2247,7 +2251,7 @@
       "quote": "Fire-and-forget at app startup (`src/main/index.ts`, `importToolStatusService.getStatus()`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:587",
+      "source": "src/main/index.ts:585",
       "match": "importToolStatusService.getStatus().catch((error) => {"
     },
     {
@@ -2288,7 +2292,7 @@
       "quote": "Write to the project's `import/` directory, auto-creating it (`IMPORT_DIR_CREATE_FAILED` on failure)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:104",
+      "source": "src/shared/constants.ts:105",
       "match": "DIR_NAME: 'import',"
     },
     {
@@ -2568,8 +2572,8 @@
       "quote": "| `IMAGE_EXPORT_SOURCE_TOO_LARGE` | \"This image is over the 50 MB export limit\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/file/imageRead.ts:57",
-      "match": "export const MAX_IMAGE_SIZE = 50 * 1024 * 1024"
+      "source": "src/shared/ipc/file-image-schema.ts:49",
+      "match": "export const IMAGE_READ_MAX_BYTES = 50 * 1024 * 1024"
     },
     {
       "id": "docs-error-codes/08",
@@ -2598,7 +2602,7 @@
       "quote": "| `SCREENSHOT_TIMEOUT` | \"Screenshot capture timed out\" | 30s for macOS screencapture; 60s for the cross-platform overlay |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:275",
+      "source": "src/shared/constants.ts:276",
       "match": "TIMEOUT_MS: 30_000,"
     },
     {
@@ -2739,7 +2743,7 @@
       "quote": "Up to `PREVIEW.MAX_LIVE_VIEWS` previews run at once",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,"
     },
     {
@@ -2899,7 +2903,7 @@
       "quote": "**Installation**: Called early in `src/main/index.ts`, before the services start",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:73",
+      "source": "src/main/index.ts:74",
       "match": "installSafeConsole()"
     },
     {
@@ -3020,7 +3024,7 @@
       "quote": "the single source of truth is `LOGS_DIR_RELATIVE` (`.erfana/logs`) in `src/shared/constants.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:38",
+      "source": "src/shared/constants.ts:39",
       "match": "export const LOGS_DIR_RELATIVE = '.erfana/logs'"
     },
     {
@@ -3090,7 +3094,7 @@
       "quote": "Tags: `[crash] startup-settings-init`, `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:463",
+      "source": "src/main/index.ts:459",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -3491,7 +3495,7 @@
       "quote": "`rejectedCount`, `rejected` – the first 64 `{ index, reason }`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:127",
+      "source": "src/main/services/ProjectService.ts:128",
       "match": "const MAX_LOGGED_EXCLUDE_REJECTIONS = 64"
     },
     {
@@ -4604,7 +4608,7 @@
       "quote": "| Main process | `src/main/index.ts` (before-quit event) |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:708",
+      "source": "src/main/index.ts:706",
       "match": "app.on('before-quit',"
     },
     {
@@ -4684,7 +4688,7 @@
       "quote": "(`.erfana/logs in your home folder`, from the shared `LOGS_DIR_RELATIVE` constant)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:38",
+      "source": "src/shared/constants.ts:39",
       "match": "export const LOGS_DIR_RELATIVE = '.erfana/logs'"
     },
     {
@@ -4834,7 +4838,7 @@
       "quote": "carrying `Reloaded from disk` or `Auto-refresh unavailable`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:123",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:108",
       "match": "unavailable: 'Auto-refresh unavailable',"
     },
     {
@@ -4844,7 +4848,7 @@
       "quote": "**Export controls** (#73): Export as PNG, Export as PDF and Copy image",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:198",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:168",
       "match": "tooltip: 'Export as PDF',"
     },
     {
@@ -4864,7 +4868,7 @@
       "quote": "- `ImageViewerPanel.module.css` - The panel's styles, as a CSS module",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:59",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:61",
       "match": "import styles from './ImageViewerPanel.module.css'",
       "note": "Said \"The one remaining CSS module in the app\" – an absence claim no line proves; reworded to what the import shows."
     },
@@ -4905,7 +4909,7 @@
       "quote": "when importing audio (MP3, WAV, M4A, OGG, FLAC)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:366",
+      "source": "src/shared/constants.ts:367",
       "match": "SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a', 'ogg', 'flac']"
     },
     {
@@ -4915,7 +4919,7 @@
       "quote": "or video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:415",
+      "source": "src/shared/constants.ts:416",
       "match": "SUPPORTED_EXTENSIONS: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'],"
     },
     {
@@ -5494,7 +5498,7 @@
       "quote": "`FileConflictNotification.css:87`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.css:87",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.css:97",
       "match": "transform: translateY(-1px);"
     },
     {
@@ -5951,7 +5955,7 @@
       "quote": "where N = ceil(duration / 480s)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:344",
+      "source": "src/shared/constants.ts:345",
       "match": "CHUNK_BOUNDARY_SECONDS: 8 * 60"
     },
     {
@@ -6231,7 +6235,7 @@
       "quote": "`Reloaded from disk` shows briefly",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:121",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:106",
       "match": "reloading: 'Reloaded from disk',"
     },
     {
@@ -6241,7 +6245,7 @@
       "quote": "persistent `Updated hh:mm:ss` stamp",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:434",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:366",
       "match": "`Updated ${clock}`"
     },
     {
@@ -6261,8 +6265,9 @@
       "quote": "the app-wide 100-file watch cap",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:32",
-      "match": "MAX_WATCHED_FILES = 100"
+      "source": "src/shared/freshness/timingProfiles.ts:30",
+      "match": "tabs: { perOwnerCap: null, totalCap: 100 }",
+      "note": "Re-anchored by #478 (S8-S11 watch layer)"
     },
     {
       "id": "docs-features-README/19",
@@ -6271,7 +6276,7 @@
       "quote": "OpenAI API (GPT-4o-transcribe primary",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:360",
+      "source": "src/shared/constants.ts:361",
       "match": "PRIMARY_MODEL: 'gpt-4o-transcribe',"
     },
     {
@@ -6281,7 +6286,7 @@
       "quote": "Whisper-1 fallback)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:362",
+      "source": "src/shared/constants.ts:363",
       "match": "FALLBACK_MODEL: 'whisper-1',"
     },
     {
@@ -6291,7 +6296,7 @@
       "quote": "file chunking for long recordings (>8 min)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:344",
+      "source": "src/shared/constants.ts:345",
       "match": "CHUNK_BOUNDARY_SECONDS: 8 * 60"
     },
     {
@@ -7371,7 +7376,7 @@
       "quote": "| `src/main/index.ts` | import + call `registerClipboardHandlers()` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:529",
+      "source": "src/main/index.ts:527",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -8531,7 +8536,7 @@
       "quote": "`ERFANA_E2E_FORCE_CRASH=1` in the launching environment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:188",
       "match": "process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -8622,7 +8627,7 @@
       "quote": "capped at `MAX_LIVE_VIEWS`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,"
     },
     {
@@ -8743,7 +8748,7 @@
       "quote": "Registered in `src/main/index.ts` as `registerBrowserHandlers()`, next to `registerImageExportHandlers()`.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:532",
+      "source": "src/main/index.ts:530",
       "match": "registerBrowserHandlers()",
       "note": "Cited index.ts :417; registration is now at :534–536. Named the call instead."
     },
@@ -8754,7 +8759,7 @@
       "quote": "the `!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'` check in `src/main/index.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:188",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'",
       "note": "Cited src/main/index.ts:161; the check is at :187. Named the check instead."
     },
@@ -8830,7 +8835,7 @@
       "quote": "The app ships one window (`createWindow` in `src/main/index.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:197",
+      "source": "src/main/index.ts:198",
       "match": "function createWindow(): BrowserWindow",
       "note": "Cited src/main/index.ts:172, which is now a command-line switch. Named createWindow instead."
     },
@@ -8932,8 +8937,9 @@
       "quote": "// Chokidar-based file watcher (existing)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:3",
-      "match": "import { FSWatcher } from 'chokidar'"
+      "source": "src/main/services/watcher/FileWatchCore.ts:12",
+      "match": "import type { FSWatcher } from 'chokidar'",
+      "note": "Re-anchored by #478 (S8-S11 watch layer)"
     },
     {
       "id": "docs-future-graph-engine/01",
@@ -9349,21 +9355,12 @@
       "id": "docs-spikes-html-preview-comments/06",
       "audience": "developer",
       "doc": "docs/spikes/html-preview-comments.md",
-      "quote": "used the same options as `PREVIEW_ENTRY_WATCH_OVERRIDES`",
-      "status": "verified",
+      "quote": "used the same options as the preview entry watch then did (50 ms write-finish wait, now the `preview` timing profile",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/preview/buildPreviewGraph.ts:104",
-      "match": "const PREVIEW_ENTRY_WATCH_OVERRIDES: Partial<ChokidarOptions> = {"
-    },
-    {
-      "id": "docs-spikes-html-preview-comments/07",
-      "audience": "developer",
-      "doc": "docs/spikes/html-preview-comments.md",
-      "quote": "(`createRearmingSingleFileWatcher` is TS source)",
-      "status": "verified",
-      "evidence": "source",
-      "source": "src/main/services/watcher/rearmingSingleFileWatch.ts:80",
-      "match": "export function createRearmingSingleFileWatcher("
+      "source": "src/shared/freshness/timingProfiles.ts:113",
+      "match": "settleMs: 50,",
+      "note": "Reworded by #478 S17: `PREVIEW_ENTRY_WATCH_OVERRIDES` was removed; the page watch reads the preview profile"
     },
     {
       "id": "docs-spikes-html-preview-comments/08",
@@ -9412,7 +9409,7 @@
       "quote": "still far below `MAX_ASSET_BYTES` 25 MB",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:505",
+      "source": "src/shared/constants.ts:506",
       "match": "MAX_ASSET_BYTES: 25 * 1024 * 1024,"
     },
     {
@@ -9506,7 +9503,7 @@
       "quote": "**File:** `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:421",
+      "source": "src/main/index.ts:417",
       "match": "app.whenReady()"
     },
     {
@@ -9991,7 +9988,7 @@
       "quote": "appends `FORCE_CRASH_ARG` (`--erfana-force-crash`, `src/shared/constants.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:53",
+      "source": "src/shared/constants.ts:54",
       "match": "export const FORCE_CRASH_ARG = '--erfana-force-crash'"
     },
     {
@@ -10001,7 +9998,7 @@
       "quote": "`!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:188",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -10011,7 +10008,7 @@
       "quote": "preload: join(__dirname, '../preload/index.js'),",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:216",
+      "source": "src/main/index.ts:217",
       "match": "preload: join(__dirname, '../preload/index.js'),"
     },
     {
@@ -10021,7 +10018,7 @@
       "quote": "contextIsolation: true,    // NEVER disable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:219",
+      "source": "src/main/index.ts:220",
       "match": "contextIsolation: true,"
     },
     {
@@ -10031,7 +10028,7 @@
       "quote": "nodeIntegration: false,    // NEVER enable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:220",
+      "source": "src/main/index.ts:221",
       "match": "nodeIntegration: false,"
     },
     {
@@ -10201,7 +10198,7 @@
       "quote": "is registered with `registerConfinedHandle` (`src/main/ipc/confinement/`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/confinement/registerConfinedHandle.ts:175",
+      "source": "src/main/ipc/confinement/registerConfinedHandle.ts:159",
       "match": "export function registerConfinedHandle<"
     },
     {
@@ -10501,7 +10498,7 @@
       "quote": "files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) are rejected with `IMPORT_EXCEEDS_SIZE_LIMIT`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:115",
+      "source": "src/shared/constants.ts:116",
       "match": "SIZE_HARD_LIMIT: 250 * BYTES_PER_MB,"
     },
     {
@@ -10911,7 +10908,7 @@
       "quote": "via OpenAI API (GPT-4o-transcribe, Whisper-1 fallback)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:362",
+      "source": "src/shared/constants.ts:363",
       "match": "FALLBACK_MODEL: 'whisper-1',"
     },
     {
@@ -11232,7 +11229,7 @@
       "quote": "Open DevTools in app with F12 (development builds only)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:448",
+      "source": "src/main/index.ts:444",
       "match": "optimizer.watchWindowShortcuts(window)"
     },
     {
@@ -11252,7 +11249,7 @@
       "quote": "A message box titled \"Erfana started with problems\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:405",
+      "source": "src/main/index.ts:401",
       "match": "title: 'Erfana started with problems',"
     },
     {
@@ -11262,7 +11259,7 @@
       "quote": "the lines tagged `[crash] startup-settings-init` and `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:463",
+      "source": "src/main/index.ts:459",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -13150,7 +13147,7 @@
       "quote": "in `src/main/index.ts`, beside the others (`registerBrowserHandlers()` is there)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:532",
+      "source": "src/main/index.ts:530",
       "match": "registerBrowserHandlers()"
     },
     {
@@ -13310,7 +13307,7 @@
       "quote": "`ProjectService` calls `settingsService.setLastProjectPath(newPath)` when a project opens",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:282",
+      "source": "src/main/services/ProjectService.ts:270",
       "match": "await this.settingsService.setLastProjectPath(newPath)"
     },
     {
@@ -13508,11 +13505,12 @@
       "id": "development-tasks/43",
       "audience": "developer",
       "doc": "docs/development-tasks.md",
-      "quote": "- File content reload (300ms debounce)",
-      "status": "verified",
+      "quote": "- File content reload (75 ms write-finish wait)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:31",
-      "match": "private readonly DEBOUNCE_DELAY = 300 // ms"
+      "source": "src/shared/freshness/timingProfiles.ts:86",
+      "match": "settleMs: 75,",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "development-tasks/44",
@@ -13735,7 +13733,7 @@
       "quote": "Makes the main process append `--erfana-force-crash` to `webPreferences.additionalArguments`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:188",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -14052,7 +14050,7 @@
       "quote": "**Reload from Disk** → the editor shows the disk version and the bar clears",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:48",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:66",
       "match": "Reload from Disk"
     },
     {
@@ -14062,8 +14060,9 @@
       "quote": "**Keep My Version** → your edits survive in the editor and win the next save",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:56",
-      "match": "Keep My Version"
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:74",
+      "match": "Keep My Version",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "testing-e2e-helpers/01",
@@ -14147,7 +14146,7 @@
       "quote": "Waits for the cursor to be attached in a focused editor (`.monaco-editor.focused .cursor`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/pages/monaco.page.ts:208",
+      "source": "e2e/pages/monaco.page.ts:221",
       "match": "const cursor = this.getEditor().locator('.monaco-editor.focused .cursor')",
       "note": "Said it waits for the cursor to be visible; it waits for it to be attached."
     },
@@ -14269,7 +14268,7 @@
       "quote": "window.close() → main process 'close' event → 'quit:requested' IPC",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:249",
+      "source": "src/main/index.ts:250",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {
@@ -14320,7 +14319,7 @@
       "quote": "`MarkdownEditorPanel` mounts `useKeyboardShortcuts`, which registers on `window`.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:491",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:474",
       "match": "enabled: isActivePanel"
     },
     {
@@ -14340,7 +14339,7 @@
       "quote": "wrap the call at the JSX site (`onClick={() => onReload()}`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:43",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:61",
       "match": "onClick={() => onReload()}"
     },
     {
@@ -14485,7 +14484,7 @@
       "quote": "Auto-save after 2000 ms (the `useAutoSave` debounce",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }"
     },
     {
@@ -14506,7 +14505,7 @@
       "quote": "Stats appear in the `DocumentStatsBar` footer of the editor panel",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:724",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:704",
       "match": "<DocumentStatsBar stats={documentStats} selectedText={selectedText} />",
       "note": "Said the stats appear in the editor header; they are a footer bar."
     },
@@ -14920,7 +14919,7 @@
       "quote": "installed only for an unpackaged app launched with `ERFANA_E2E_TEST_HOOKS=1`,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:191",
+      "source": "src/main/index.ts:192",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1') {"
     },
     {
@@ -14993,7 +14992,7 @@
       "quote": "sd-074b D5: the `PREVIEW.MAX_LIVE_VIEWS` live-view budget",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,"
     },
     {
@@ -15355,7 +15354,7 @@
       "quote": "macOS uses the native `/usr/sbin/screencapture` binary",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:281",
+      "source": "src/shared/constants.ts:282",
       "match": "BINARY_PATH: '/usr/sbin/screencapture'"
     },
     {
@@ -15365,7 +15364,7 @@
       "quote": "- Screenshots saved to OS temp directory as PNG (`erfana-screenshot-{timestamp}.png`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:277",
+      "source": "src/shared/constants.ts:278",
       "match": "TEMP_PREFIX: 'erfana-screenshot-'"
     },
     {
@@ -15375,7 +15374,7 @@
       "quote": "- 30 s timeout for the macOS native selection, 60 s for the cross-platform overlay (`SCREENSHOT.OVERLAY_TIMEOUT_MS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:285",
+      "source": "src/shared/constants.ts:286",
       "match": "OVERLAY_TIMEOUT_MS: 60_000"
     },
     {
@@ -16046,7 +16045,7 @@
       "quote": "app.commandLine.appendSwitch('enable-webgl2-compute-context')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:171",
+      "source": "src/main/index.ts:172",
       "match": "app.commandLine.appendSwitch('enable-webgl2-compute-context')"
     },
     {
@@ -16056,7 +16055,7 @@
       "quote": "app.commandLine.appendSwitch('ignore-gpu-blocklist')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:172",
+      "source": "src/main/index.ts:173",
       "match": "app.commandLine.appendSwitch('ignore-gpu-blocklist')"
     },
     {
@@ -16066,7 +16065,7 @@
       "quote": "// TODO: Test if still needed with Electron 39+ (Chromium 142)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:169",
+      "source": "src/main/index.ts:170",
       "match": "// TODO: Test if still needed with Electron 39+ (Chromium 142)"
     },
     {
@@ -16076,7 +16075,7 @@
       "quote": "(`src/main/index.ts` notes it is \"not needed for current functionality\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:223",
+      "source": "src/main/index.ts:224",
       "match": "// experimentalFeatures removed - not needed for current functionality"
     },
     {
@@ -16621,7 +16620,7 @@
       "quote": "it takes `INDICATOR_DURATION_MS` from `constants/fileWatch.ts` rather than owning it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:13",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:29",
       "match": "import { INDICATOR_DURATION_MS } from '../constants/fileWatch'"
     },
     {
@@ -16631,7 +16630,7 @@
       "quote": "wires to `useDockviewValue(props.api, DOCKVIEW_PANEL_ACTIVE)` (which follows `onDidActiveChange`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:133",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:138",
       "match": "const isActivePanel = useDockviewValue(props.api, DOCKVIEW_PANEL_ACTIVE)",
       "note": "Said it reads props.api.isActive directly; it goes through useDockviewValue."
     },
@@ -17299,7 +17298,7 @@
       "quote": "PNG, JPEG, GIF, WebP, SVG only, and regular files only. 16 MB per image –",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/markdown-image-schema.ts:51",
+      "source": "src/shared/ipc/markdown-image-schema.ts:52",
       "match": "export const MARKDOWN_IMAGE_MAX_BYTES = 16 * 1024 * 1024"
     },
     {
@@ -17309,8 +17308,8 @@
       "quote": "lower than the image viewer's 50 MB, because the document picks what is read.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/file/imageRead.ts:57",
-      "match": "export const MAX_IMAGE_SIZE = 50 * 1024 * 1024"
+      "source": "src/shared/ipc/file-image-schema.ts:49",
+      "match": "export const IMAGE_READ_MAX_BYTES = 50 * 1024 * 1024"
     },
     {
       "id": "docs-editor-markdown-preview/20",
@@ -17319,7 +17318,7 @@
       "quote": "A preview holds at most 64 files and",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/markdown-image-schema.ts:44",
+      "source": "src/shared/ipc/markdown-image-schema.ts:45",
       "match": "export const MAX_MARKDOWN_IMAGES_PER_DOCUMENT = 64"
     },
     {
@@ -17329,7 +17328,7 @@
       "quote": "keeps at most 4 reads in flight",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:75",
+      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:74",
       "match": "export const MARKDOWN_IMAGE_MAX_CONCURRENT_READS = 4"
     },
     {
@@ -17339,18 +17338,18 @@
       "quote": "all Markdown previews in a window, hidden ones included, share 128 MB of",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/markdown-image-schema.ts:58",
+      "source": "src/shared/ipc/markdown-image-schema.ts:59",
       "match": "export const MARKDOWN_IMAGE_BYTE_BUDGET = 128 * 1024 * 1024"
     },
     {
       "id": "docs-editor-markdown-preview/23",
       "audience": "developer",
       "doc": "docs/editor/markdown-preview.md",
-      "quote": "settles a burst (300 ms, at most 2 s)",
+      "quote": "settles a burst (75 ms, at most 2 s)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:71",
-      "match": "export const MARKDOWN_IMAGE_SETTLE_MS = 300"
+      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:70",
+      "match": "const SETTLE_MS = TIMING_PROFILES.dependent.settleMs"
     },
     {
       "id": "docs-editor-markdown-preview/24",
@@ -17714,7 +17713,7 @@
       "quote": "only the **3 most recently used** previews stay running",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,"
     },
     {
@@ -17874,8 +17873,8 @@
       "quote": "**At most 16 files are watched per preview.**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:550",
-      "match": "MAX_WATCHED_FILES: 16,"
+      "source": "src/shared/freshness/timingProfiles.ts:32",
+      "match": "preview: { perOwnerCap: 16, totalCap: 64 }"
     },
     {
       "id": "docs-html-preview-README/18",
@@ -17914,7 +17913,7 @@
       "quote": "it allows 50 ms either way for the coarser clock file times use",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/PreviewWatchPool.ts:62",
+      "source": "src/main/services/preview/PreviewWatchPool.ts:68",
       "match": "export const WATCH_CATCH_UP_SLACK_MS = 50"
     },
     {
@@ -17946,7 +17945,7 @@
       "quote": "\"HTML preview of page.html – press Enter to enter the page, Escape to come back\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/htmlPreview.logic.ts:297",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/htmlPreview.logic.ts:303",
       "match": "– press Enter to enter the page, Escape to come back"
     },
     {
@@ -18525,7 +18524,7 @@
       "quote": "- **Import**: Processes file through ImportService (always to `import/` folder)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:104",
+      "source": "src/shared/constants.ts:105",
       "match": "DIR_NAME: 'import',"
     },
     {
@@ -18897,7 +18896,7 @@
       "quote": "a pause never resumed is ended by the 10 s safety timeout (`PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:489",
+      "source": "src/shared/constants.ts:490",
       "match": "SAFETY_TIMEOUT_MS: 10_000",
       "note": "Replaced the untraceable \"typically <100ms\" duration."
     },
@@ -19024,7 +19023,7 @@
       "quote": "Both paths are resolved inside the open project by `registerConfinedHandle`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/confinement/registerConfinedHandle.ts:175",
+      "source": "src/main/ipc/confinement/registerConfinedHandle.ts:159",
       "match": "export function registerConfinedHandle<",
       "note": "Said FileService.moveItem/copyItem hold startsWith project guards; they no longer exist."
     },
@@ -19492,21 +19491,23 @@
       "id": "docs-file-watching-README/02",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "- **Debouncing**: 300ms (optimized for single file saves)",
-      "status": "verified",
+      "quote": "- **Write-finish wait**: per profile – 75 ms for an editor tab",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:31",
-      "match": "private readonly DEBOUNCE_DELAY = 300 // ms"
+      "source": "src/shared/freshness/timingProfiles.ts:86",
+      "match": "settleMs: 75,",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-file-watching-README/03",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "- **Limit**: 100 files maximum, app-wide (security).",
-      "status": "verified",
+      "quote": "- **Limit**: 100 files for editor and image tabs, app-wide",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:32",
-      "match": "private readonly MAX_WATCHED_FILES = 100"
+      "source": "src/shared/freshness/timingProfiles.ts:30",
+      "match": "tabs: { perOwnerCap: null, totalCap: 100 }",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-file-watching-README/04",
@@ -19515,7 +19516,7 @@
       "quote": "- **Symlinks**: `followSymlinks: false`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/singleFileWatch.ts:46",
+      "source": "src/main/services/watcher/singleFileWatch.ts:47",
       "match": "followSymlinks: false,"
     },
     {
@@ -19525,7 +19526,7 @@
       "quote": "Auto-reload silently, show \"Reloaded from disk\" in toolbar (1s)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/constants/fileWatch.ts:24",
+      "source": "src/renderer/src/constants/fileWatch.ts:26",
       "match": "export const INDICATOR_DURATION_MS = 1000"
     },
     {
@@ -19555,7 +19556,7 @@
       "quote": "one `stat` at a time with a 1 s time box (a timeout counts as present), every 2 s plus the last round's duration",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/unseenWatchProbe.ts:39",
+      "source": "src/main/services/watcher/unseenWatchProbe.ts:43",
       "match": "export const UNSEEN_STAT_TIMEOUT_MS = 1000"
     },
     {
@@ -19572,11 +19573,12 @@
       "id": "docs-file-watching-README/10",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "| `file-watch:stopAll` | Renderer → Main | Drop every watch held by this window |",
-      "status": "verified",
+      "quote": "| `file-watch:unsubscribe` | Renderer → Main | Stop one subscription (`{ watchId }`); a foreign or unknown id is a no-op |",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-watcher-handlers.ts:54",
-      "match": "registerHandle('file-watch:stopAll', async (event) => {"
+      "source": "src/shared/ipc/file-watch-channels.ts:17",
+      "match": "unsubscribe: 'file-watch:unsubscribe',",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/11",
@@ -19585,7 +19587,7 @@
       "quote": "- **Reload from Disk**: Discard local changes, load external version",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:48",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:66",
       "match": "Reload from Disk"
     },
     {
@@ -19595,18 +19597,20 @@
       "quote": "- **Keep My Version**: Ignore external changes, keep local edits",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:56",
-      "match": "Keep My Version"
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:74",
+      "match": "Keep My Version",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/13",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "Write `onClick={() => onReload()}`.",
-      "status": "verified",
+      "quote": "each wrapped by `FreshnessNotice` so a click event is never passed on as an argument",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:43",
-      "match": "onClick={() => onReload()}"
+      "source": "src/renderer/src/components/FileConflictNotification/FreshnessNotice.tsx:59",
+      "match": "onClick={() => onClick()}",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/14",
@@ -19615,7 +19619,7 @@
       "quote": "| File is back within the 100 ms window |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/AtomicSaveDetector.ts:35",
+      "source": "src/main/services/watcher/AtomicSaveDetector.ts:41",
       "match": "const ATOMIC_SAVE_DELAY_MS = 100"
     },
     {
@@ -19645,7 +19649,7 @@
       "quote": "`tree.hiddenPatterns` name (the tree's own rule; default `node_modules` and `.git`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:192",
+      "source": "src/shared/constants.ts:193",
       "match": "export const DEFAULT_TREE_HIDDEN_PATTERNS = ["
     },
     {
@@ -19655,7 +19659,7 @@
       "quote": "- `dist/`, `build/`, `out/`, `.output/` - Build outputs",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:169",
+      "source": "src/shared/constants.ts:170",
       "match": "'.output',"
     },
     {
@@ -19725,7 +19729,7 @@
       "quote": "The PauseController includes a 10-second safety timeout.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:489",
+      "source": "src/shared/constants.ts:490",
       "match": "SAFETY_TIMEOUT_MS: 10_000"
     },
     {
@@ -20018,12 +20022,12 @@
       "id": "docs-file-watching-technical-details/08",
       "audience": "developer",
       "doc": "docs/file-watching/technical-details.md",
-      "quote": "registerHandle('file-watch:start', async (event, filePath: string) => {",
+      "quote": "  FILE_WATCH_CHANNELS.subscribe,",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-watcher-handlers.ts:14",
-      "match": "registerHandle('file-watch:start', async (event, filePath: string) => {",
-      "note": "Excerpt used ipcMain.handle and returned the error directly instead of throwing into the catch."
+      "source": "src/main/ipc/file-watcher-handlers.ts:146",
+      "match": "FILE_WATCH_CHANNELS.subscribe,",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/01",
@@ -20062,22 +20066,23 @@
       "id": "docs-file-watching-patterns-and-testing/04",
       "audience": "developer",
       "doc": "docs/file-watching/patterns-and-testing.md",
-      "quote": "const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {",
+      "quote": "const { state, tracker } = useFreshness<TextVersion>({ filePath, profile: 'editor', rule, ready, baseline, visible })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:390",
-      "match": "const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {",
-      "note": "Excerpt used window.api.fileWatch directly."
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:165",
+      "match": "const { state, tracker } = useFreshness<TextVersion>({ filePath, profile: 'editor', rule, ready, baseline, visible })",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/05",
       "audience": "developer",
       "doc": "docs/file-watching/patterns-and-testing.md",
-      "quote": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {",
-      "status": "verified",
+      "quote": "void tracker.begin(baselineRef.current)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:382",
-      "match": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {"
+      "source": "src/renderer/src/hooks/useFreshness.ts:139",
+      "match": "void tracker.begin(baselineRef.current)",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/06",
@@ -20094,12 +20099,12 @@
       "id": "docs-file-watching-patterns-and-testing/07",
       "audience": "developer",
       "doc": "docs/file-watching/patterns-and-testing.md",
-      "quote": "`ProjectService.updateServices(root)` points all three services at the new root",
+      "quote": "`ProjectService.updateServices(root)` points the two services that still take a pushed root at the new root",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:243",
+      "source": "src/main/services/ProjectService.ts:231",
       "match": "this.directoryWatcherService.setProjectPath(root)",
-      "note": "Calls were tied to auto-restore; they run on every session change."
+      "note": "Calls were tied to auto-restore; they run on every session change. Reworded by #478 S21: FileWatcherService reads the bound session instead of a pushed root."
     },
     {
       "id": "docs-file-watching-patterns-and-testing/08",
@@ -20115,11 +20120,12 @@
       "id": "docs-file-watching-patterns-and-testing/09",
       "audience": "developer",
       "doc": "docs/file-watching/patterns-and-testing.md",
-      "quote": "# - Red warning banner: \"This file was deleted on disk. Save to restore it.\"",
-      "status": "verified",
+      "quote": "was deleted, renamed or moved on disk.\" with Restore file and Close tab",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:682",
-      "match": "<span>This file was deleted on disk. Save to restore it.</span>"
+      "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:103",
+      "match": "was deleted, renamed or moved on disk.",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/10",
@@ -20602,7 +20608,7 @@
       "quote": "(`.git` itself is not shown: it is a default `tree.hiddenPatterns` name",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:192",
+      "source": "src/shared/constants.ts:193",
       "match": "export const DEFAULT_TREE_HIDDEN_PATTERNS = [",
       "note": "Listed `.git/` as a visible dimmed example; it is hidden from the tree by default."
     },
@@ -21113,7 +21119,7 @@
       "quote": "Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,"
     },
     {
@@ -21143,7 +21149,7 @@
       "quote": "`PARTITION_PURGE_TIMEOUT_MS`, all 2 s",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:638",
+      "source": "src/shared/constants.ts:632",
       "match": "PARTITION_PURGE_TIMEOUT_MS: 2000,"
     },
     {
@@ -21487,7 +21493,7 @@
       "quote": "`MarkdownPreview.tsx` has since shrunk to 1,313",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/max-lines-baseline.json:27",
+      "source": "scripts/max-lines-baseline.json:26",
       "match": "\"src/renderer/src/components/Editor/MarkdownPreview.tsx\": 1313",
       "note": "\"Both are frozen at those sizes\" no longer held for MarkdownPreview.tsx: the ratchet lowered its cap to 1,317; the page now says so."
     },
@@ -21690,12 +21696,12 @@
       "id": "docs-technical-debt/28",
       "audience": "developer",
       "doc": "docs/technical-debt.md",
-      "quote": "(`FileWatcherService.ts:123`)",
+      "quote": "every subscribe and every re-arm goes through `checkTarget` in `watcher/armWatch.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:123",
-      "match": "!isLexicallyInside(filePath, this.projectPath)",
-      "note": "Line reference was :112"
+      "source": "src/main/services/watcher/armWatch.ts:146",
+      "match": "isInsideRoot(real, session.realRoot, session.caseSensitive)",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-technical-debt/29",
@@ -21761,12 +21767,12 @@
       "id": "docs-technical-debt/35",
       "audience": "developer",
       "doc": "docs/technical-debt.md",
-      "quote": "It has since grown past it: 579 lines, frozen there in `scripts/max-lines-baseline.json`.",
+      "quote": "#478 moved its native-watcher half into `src/main/services/watcher/FileWatchCore.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/max-lines-baseline.json:9",
-      "match": "\"src/main/services/FileWatcherService.ts\": 579",
-      "note": "Said the file stayed under the cap; it is 581 lines and baselined"
+      "source": "src/main/services/FileWatcherService.ts:34",
+      "match": "import { FileWatchCore } from './watcher/FileWatchCore'",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-technical-debt/36",
@@ -21775,7 +21781,7 @@
       "quote": "The editor hook sets a 1000 ms \"Reloaded from disk\" timer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/constants/fileWatch.ts:24",
+      "source": "src/renderer/src/constants/fileWatch.ts:26",
       "match": "export const INDICATOR_DURATION_MS = 1000"
     },
     {
@@ -21785,7 +21791,7 @@
       "quote": "now live in `src/shared/ipc/image-formats.ts`; `src/main/services/file/imageRead.ts` and",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/file/imageRead.ts:44",
+      "source": "src/main/services/file/imageRead.ts:52",
       "match": "} from '../../../shared/ipc/image-formats'"
     },
     {
@@ -21825,7 +21831,7 @@
       "quote": "buffers up to `PREVIEW.MAX_ASSET_BYTES` (25 MB) per request",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:505",
+      "source": "src/shared/constants.ts:506",
       "match": "MAX_ASSET_BYTES: 25 * 1024 * 1024,"
     },
     {
@@ -21876,7 +21882,7 @@
       "quote": "`PreviewOpenFileRequestedSchema` caps it at 512",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/preview-schema.ts:396",
+      "source": "src/shared/ipc/preview-schema.ts:401",
       "match": "anchor: z.string().max(512).nullable(),"
     },
     {
@@ -22012,7 +22018,7 @@
       "quote": "`src/main/services/watcher/NativeRecursiveWatcher.ts` is 1,041 lines",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/max-lines-baseline.json:22",
+      "source": "scripts/max-lines-baseline.json:21",
       "match": "\"src/main/services/watcher/NativeRecursiveWatcher.ts\": 1041"
     },
     {
@@ -22412,7 +22418,7 @@
       "quote": "(`DEFAULT_TREE_HIDDEN_PATTERNS`, `DEFAULT_WATCHER_IGNORE_PATTERNS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:192",
+      "source": "src/shared/constants.ts:193",
       "match": "export const DEFAULT_TREE_HIDDEN_PATTERNS = ["
     },
     {
@@ -22723,7 +22729,7 @@
       "quote": "`ProjectService.ts:86-88` (`foldCase`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:86",
+      "source": "src/main/services/ProjectService.ts:87",
       "match": "function foldCase(p: string): string {"
     },
     {
@@ -23268,7 +23274,7 @@
       "quote": "`main/index.ts:612-643` (dock menu and jump list carry only \"New Window\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:629",
+      "source": "src/main/index.ts:627",
       "match": "title: 'New Window',"
     },
     {
@@ -23298,7 +23304,7 @@
       "quote": "`src/main/index.ts:613-624` — macOS dock menu (`app.dock.setMenu`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:618",
+      "source": "src/main/index.ts:616",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -23308,7 +23314,7 @@
       "quote": "`src/main/index.ts:626-643` — Windows jumplist (`app.setJumpList`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:623",
+      "source": "src/main/index.ts:621",
       "match": "app.setJumpList(["
     },
     {
@@ -23358,7 +23364,7 @@
       "quote": "`foldCase` in `ProjectService.ts:86-88`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:86",
+      "source": "src/main/services/ProjectService.ts:87",
       "match": "function foldCase(p: string): string {"
     },
     {
@@ -23883,7 +23889,7 @@
       "quote": "| macOS | `~/.erfana/logs/main.log` |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:38",
+      "source": "src/shared/constants.ts:39",
       "match": "LOGS_DIR_RELATIVE = '.erfana/logs'",
       "note": "said ~/Library/Logs/erfana/main.log; LoggingService writes under the home folder"
     },
@@ -23905,7 +23911,7 @@
       "quote": "| Linux | `~/.erfana/logs/main.log`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:38",
+      "source": "src/shared/constants.ts:39",
       "match": "LOGS_DIR_RELATIVE = '.erfana/logs'",
       "note": "said ~/.config/erfana/logs/main.log"
     },
@@ -24133,7 +24139,7 @@
       "quote": "`PreviewViewService.test.ts:1117`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/preview/PreviewViewService.test.ts:1117",
+      "source": "src/main/services/preview/PreviewViewService.test.ts:1118",
       "match": "expect(h.setWatchSet).toHaveBeenCalledWith(",
       "note": "said :1100"
     },
@@ -24217,7 +24223,7 @@
       "quote": "| `src/main/index.test.ts:610` (`Window Title Configuration",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.test.ts:623",
+      "source": "src/main/index.test.ts:624",
       "match": "should set title to \"ERFANA v{version}\" in production mode"
     },
     {
@@ -24813,7 +24819,7 @@
       "quote": "therefore takes an `enabled` flag, and `MarkdownEditorPanel` wires it to the",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:491",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:474",
       "match": "enabled: isActivePanel"
     },
     {
@@ -24874,7 +24880,7 @@
       "quote": "press Enter to enter the page, Escape to come back",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/htmlPreview.logic.ts:297",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/htmlPreview.logic.ts:303",
       "match": "press Enter to enter the page, Escape to come back"
     },
     {
@@ -24996,7 +25002,7 @@
       "quote": "Full-screen exit is handled by Escape.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:190",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:189",
       "match": "onEscape: fullScreen.close,",
       "note": "Re-pointed: the old source line only mapped Escape to the generic fullscreen action; this line shows Escape closes full screen."
     },
@@ -25148,7 +25154,7 @@
       "quote": "`optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:448",
+      "source": "src/main/index.ts:444",
       "match": "optimizer.watchWindowShortcuts(window)",
       "note": "The call sits inside app.on('browser-window-created') (line 450), so every window gets it. Observed while checking: the same helper, called without options, also swallows Cmd/Ctrl+Minus and Cmd/Ctrl+Shift+Equal on the app window in every build (its zoom option defaults to false); not stated on this page."
     },
@@ -25351,7 +25357,7 @@
       "quote": "In a packaged build the same helper binds no `F12` and blocks `Cmd/Ctrl+R`",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/index.ts:445",
+      "source": "src/main/index.ts:441",
       "match": "ignore CommandOrControl + R in production",
       "test": "e2e/guide-tasks/claims-user-0.guide.ts",
       "note": "Behaviour lives in @electron-toolkit/utils (not in src). Real-app test: unpackaged, F12 toggles DevTools (helper attached); then the test flips the loaded helper's is.dev (= !app.isPackaged) to false and sends native key input – F12 is not prevented and DevTools stays closed, Cmd/Ctrl+R is prevented and the page does not reload. The packaged branch is reached by that flip, not by a packaged build."
@@ -25403,7 +25409,7 @@
       "quote": "`Cmd/Ctrl+W` closed *every* tab and a single `Cmd/Ctrl+S` wrote *every* open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:489",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:472",
       "match": "Without this, one ⌘W closed every open tab and one ⌘S wrote every open"
     },
     {
@@ -25990,7 +25996,7 @@
       "quote": "├── main/services/         # Backend services",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:29",
+      "source": "src/main/index.ts:30",
       "match": "from './services/WhisperModelManager'"
     },
     {
@@ -26379,7 +26385,7 @@
       "quote": "Erfana enables context isolation, disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:220",
+      "source": "src/main/index.ts:221",
       "match": "nodeIntegration: false,",
       "note": "contextIsolation: true at src/main/index.ts:219; sandbox is Electron's default (comment line 217)."
     },
@@ -26518,7 +26524,7 @@
       "quote": "disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:217",
+      "source": "src/main/index.ts:218",
       "match": "sandbox: true is the default since Electron 20"
     },
     {
@@ -26558,7 +26564,7 @@
       "quote": "Monaco with live preview, scroll sync",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:423",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:406",
       "match": "} = useScrollSync({"
     },
     {
@@ -26578,7 +26584,7 @@
       "quote": "repainting when the file changes on disk",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:128",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:147",
       "match": "const watch = useFileChangeSubscription(filePath, {"
     },
     {
@@ -26919,7 +26925,7 @@
       "quote": "is read by `ProjectSettingsService` on every project open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:500",
+      "source": "src/main/services/ProjectService.ts:486",
       "match": "this.projectSettingsService.loadSettings(newProjectPath),"
     },
     {
@@ -26929,7 +26935,7 @@
       "quote": "any failure there blocks the project from opening",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:504",
+      "source": "src/main/services/ProjectService.ts:490",
       "match": "// Settings validation failed - block project open"
     },
     {
@@ -27067,7 +27073,7 @@
       "quote": "logs the rejections and builds one `ProjectPathFilter`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:259",
+      "source": "src/main/services/ProjectService.ts:247",
       "match": "logExcludeRejections(settings.excludeRejections)"
     },
     {
@@ -27201,7 +27207,7 @@
       "quote": "`DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS` (3 s)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:447",
+      "source": "src/shared/constants.ts:448",
       "match": "TOOL_RECHECK_MIN_INTERVAL_MS: 3000,"
     },
     {
@@ -27589,31 +27595,34 @@
       "id": "troubleshooting/12",
       "audience": "user",
       "doc": "docs/troubleshooting.md",
-      "quote": "Starting watch for: /path/to/file.md",
-      "status": "verified",
+      "quote": "await window.api.fileWatch.getStats()",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:172",
-      "match": "Starting watch for: ${filePath}"
+      "source": "src/preload/fileWatchBridge.ts:21",
+      "match": "getStats: () => ipcRenderer.invoke(FILE_WATCH_CHANNELS.stats),",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "troubleshooting/13",
       "audience": "user",
       "doc": "docs/troubleshooting.md",
-      "quote": "Check for debounce timing (300ms for files)",
-      "status": "verified",
+      "quote": "Check the write-finish wait (75 ms for an editor tab)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:31",
-      "match": "private readonly DEBOUNCE_DELAY = 300"
+      "source": "src/shared/freshness/timingProfiles.ts:86",
+      "match": "settleMs: 75,",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "troubleshooting/14",
       "audience": "user",
       "doc": "docs/troubleshooting.md",
-      "quote": "Should see: 📝 File changed externally: /path/to/file.md",
-      "status": "verified",
+      "quote": "Should see: 📝 File changed externally: [redacted]/file.md",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:394",
-      "match": "File changed externally: ${filePath}"
+      "source": "src/main/services/watcher/FileWatchCore.ts:190",
+      "match": "File changed externally: ${redactPath(entry.filePath)}",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "troubleshooting/15",
@@ -27622,8 +27631,9 @@
       "quote": "File is paused (during save operation)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:380",
-      "match": "// Ignore if paused (during our own save)"
+      "source": "src/main/services/watcher/FileWatchCore.ts:186",
+      "match": "if (sub.paused) sub.missed = true",
+      "note": "Re-anchored by #478 (S8-S11 watch layer)"
     },
     {
       "id": "troubleshooting/16",
@@ -27632,7 +27642,7 @@
       "quote": "awaitWriteFinish: { stabilityThreshold: 300 },",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/singleFileWatch.ts:38",
+      "source": "src/main/services/watcher/singleFileWatch.ts:39",
       "match": "stabilityThreshold: 300"
     },
     {
@@ -27642,7 +27652,7 @@
       "quote": "usePolling: true,  // ADD THIS for network file systems (shipped value: false)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/singleFileWatch.ts:41",
+      "source": "src/main/services/watcher/singleFileWatch.ts:42",
       "match": "usePolling: false"
     },
     {
@@ -27652,7 +27662,7 @@
       "quote": "In src/main/services/watcher/singleFileWatch.ts (SINGLE_FILE_WATCH_OPTIONS)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/singleFileWatch.ts:34",
+      "source": "src/main/services/watcher/singleFileWatch.ts:35",
       "match": "export const SINGLE_FILE_WATCH_OPTIONS"
     },
     {
@@ -27692,7 +27702,7 @@
       "quote": "hidden (`tree.hiddenPatterns`, e.g. `.git`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:194",
+      "source": "src/shared/constants.ts:195",
       "match": "'.git'"
     },
     {
@@ -27702,7 +27712,7 @@
       "quote": "ignored (`watcher.ignoreList`: `node_modules`, build output, virtualenvs, …)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:150",
+      "source": "src/shared/constants.ts:151",
       "match": "'node_modules'"
     },
     {
@@ -27732,7 +27742,7 @@
       "quote": "default ignore list: `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:148",
+      "source": "src/shared/constants.ts:149",
       "match": "export const DEFAULT_WATCHER_IGNORE_PATTERNS"
     },
     {
@@ -27802,7 +27812,7 @@
       "quote": "hands it to the watcher with `setPathFilter`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:274",
+      "source": "src/main/services/ProjectService.ts:262",
       "match": "this.directoryWatcherService.setPathFilter(pathFilter)"
     },
     {
@@ -28010,7 +28020,7 @@
       "quote": "`ProjectService` builds the filter when the project opens",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:524",
+      "source": "src/main/services/ProjectService.ts:510",
       "match": "pathFilter = this.buildPathFilter(newProjectPath"
     },
     {
@@ -28087,11 +28097,12 @@
       "id": "troubleshooting/61",
       "audience": "user",
       "doc": "docs/troubleshooting.md",
-      "quote": "In the main-process log, should see (FileWatcherService.ts):",
-      "status": "verified",
+      "quote": "In DevTools, the watch counters should list the file:",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:172",
-      "match": "Starting watch for:"
+      "source": "src/shared/ipc/file-watch-channels.ts:29",
+      "match": "stats: 'file-watch:stats',",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-feature-inventory/01",
@@ -28120,7 +28131,7 @@
       "quote": "Recent projects: up to 5, open, remove from list",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:24",
+      "source": "src/shared/constants.ts:25",
       "match": "export const MAX_RECENT_PROJECTS = 5"
     },
     {
@@ -28192,7 +28203,7 @@
       "quote": "| APP-09 | Dock menu New Window | M | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:618",
+      "source": "src/main/index.ts:616",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -28202,7 +28213,7 @@
       "quote": "| APP-10 | Jump-list New Window | W | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:629",
+      "source": "src/main/index.ts:627",
       "match": "title: 'New Window',"
     },
     {
@@ -28222,7 +28233,7 @@
       "quote": "Autosave: 2 s after typing stops, at least every 30 s; not a setting",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }"
     },
     {
@@ -28232,8 +28243,9 @@
       "quote": "File changed on disk: Reload from Disk / Keep My Version",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:56",
-      "match": "Keep My Version"
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:74",
+      "match": "Keep My Version",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-feature-inventory/15",
@@ -28262,7 +28274,7 @@
       "quote": "Logs in `~/.erfana/logs/`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:38",
+      "source": "src/shared/constants.ts:39",
       "match": "export const LOGS_DIR_RELATIVE = '.erfana/logs'"
     },
     {
@@ -28619,7 +28631,7 @@
       "quote": "new tabs open in Preview",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:119",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:124",
       "match": "useState<ViewMode>('preview')"
     },
     {
@@ -28754,8 +28766,8 @@
       "quote": "Project images (relative path) shown and refreshed on change",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:70",
-      "match": "Quiet period (ms) after the last change event before images are re-checked."
+      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:69",
+      "match": "Quiet period (ms) after the last change event before images are re-checked"
     },
     {
       "id": "user-guide-feature-inventory/66",
@@ -28844,7 +28856,7 @@
       "quote": "Export as PNG, as PDF, copy to clipboard",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:198",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:168",
       "match": "tooltip: 'Export as PDF',",
       "test": "e2e/image-export.e2e.ts"
     },
@@ -28855,18 +28867,18 @@
       "quote": "Live refresh, \"Reloaded from disk\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:121",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:106",
       "match": "reloading: 'Reloaded from disk',"
     },
     {
       "id": "user-guide-feature-inventory/76",
       "audience": "user",
       "doc": "docs/user-guide/feature-inventory.md",
-      "quote": "deleted-file banner with Reload; 100-file watch cap",
+      "quote": "deleted-file banner (\"deleted, renamed or moved on disk\") with Close tab; 100-file watch cap",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/constants/fileWatch.ts:41",
-      "match": "export const WATCHED_FILES_CAP = 100"
+      "source": "src/shared/freshness/timingProfiles.ts:30",
+      "match": "tabs: { perOwnerCap: null, totalCap: 100 }"
     },
     {
       "id": "user-guide-feature-inventory/77",
@@ -28896,7 +28908,7 @@
       "quote": "Live page with CSS and JavaScript; 3 run at once",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,",
       "note": "Source cited docs/html-preview/README.md; now cites the code."
     },
@@ -29004,8 +29016,8 @@
       "quote": "16 watched files per preview",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:550",
-      "match": "MAX_WATCHED_FILES: 16,",
+      "source": "src/shared/freshness/timingProfiles.ts:32",
+      "match": "preview: { perOwnerCap: 16, totalCap: 64 }",
       "note": "Source column said same (a Markdown doc); now cites constants.ts."
     },
     {
@@ -29476,7 +29488,7 @@
       "quote": "Audio mp3 wav m4a ogg flac",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:366",
+      "source": "src/shared/constants.ts:367",
       "match": "SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a', 'ogg', 'flac']"
     },
     {
@@ -29486,7 +29498,7 @@
       "quote": "video mp4 mov avi mkv webm flv wmv",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:415",
+      "source": "src/shared/constants.ts:416",
       "match": "SUPPORTED_EXTENSIONS: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'],"
     },
     {
@@ -29516,7 +29528,7 @@
       "quote": "Recordings over 8 minutes are split into chunks",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:344",
+      "source": "src/shared/constants.ts:345",
       "match": "CHUNK_BOUNDARY_SECONDS: 8 * 60,",
       "note": "Said long recordings with a Markdown doc as source; now states the 8-minute boundary from the code."
     },
@@ -29547,7 +29559,7 @@
       "quote": "| EX-03 | Image to PNG / PDF / clipboard",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:190",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:160",
       "match": "tooltip: 'Export as PNG',"
     },
     {
@@ -30328,7 +30340,7 @@
       "quote": "others freeze to a still",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:531",
+      "source": "src/shared/constants.ts:532",
       "match": "recently active preview is torn down to its still frame"
     },
     {
@@ -30538,7 +30550,7 @@
       "quote": "Erfana autosaves your editor changes",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }",
       "test": "e2e/editor-save.e2e.ts"
     },
@@ -30549,8 +30561,8 @@
       "quote": "external file changes reload in the open tab",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:337",
-      "match": "await reloadFromDisk(diskContent)",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:150",
+      "match": "if (force || !edited) {",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Page said external changes simply 'appear in the open tab'; code auto-reloads only when the tab has no unsaved edits (useFileWatcher.ts:340-347), otherwise it shows a conflict bar. Page now states both cases."
     },
@@ -30613,7 +30625,7 @@
       "quote": "If the tab has unsaved edits, a \"changed on disk\" bar lets you choose instead.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:26",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:42",
       "match": "<strong>{fileName}</strong> changed on disk",
       "note": "Added: the conflict case the original sentence omitted."
     },
@@ -30861,7 +30873,7 @@
       "quote": "Erfana autosaves 2 seconds after you stop typing.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }",
       "note": "Added the actual 2000 ms debounce; previous text was vague ('after typing stops')."
     },
@@ -30872,7 +30884,7 @@
       "quote": "choose **Reload from Disk** or **Keep My Version**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:48",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:66",
       "match": "Reload from Disk"
     },
     {
@@ -30882,8 +30894,9 @@
       "quote": "or **Keep My Version**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:56",
-      "match": "Keep My Version"
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:74",
+      "match": "Keep My Version",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/04",
@@ -30892,8 +30905,9 @@
       "quote": "while you have unsaved edits, choose",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:333",
-      "match": "setExternalChangeDetected(true)"
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:159",
+      "match": "return 'held'",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/05",
@@ -30902,8 +30916,9 @@
       "quote": "With no local edits, Erfana reloads the disk change automatically.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:337",
-      "match": "await reloadFromDisk(diskContent)"
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:150",
+      "match": "if (force || !edited) {",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/06",
@@ -31030,7 +31045,7 @@
       "quote": "select a Markdown file in the project tree",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:719",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:699",
       "match": "Select a markdown file from the project panel to start editing"
     },
     {
@@ -31379,7 +31394,7 @@
       "quote": "A plain-text file over 50 MB",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:106",
+      "source": "src/shared/constants.ts:107",
       "match": "SIZE_WARNING_THRESHOLD: 50 * BYTES_PER_MB"
     },
     {
@@ -31430,7 +31445,7 @@
       "quote": "Word, PowerPoint, Excel and OpenDocument files need LibreOffice.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:436",
+      "source": "src/shared/constants.ts:437",
       "match": "'doc', 'docx', 'docm', 'odt', 'rtf',"
     },
     {
@@ -32517,8 +32532,8 @@
       "quote": "Watch the editor or preview after the agent finishes.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:337",
-      "match": "await reloadFromDisk(diskContent)",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:150",
+      "match": "if (force || !edited) {",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "An open file with no local edits auto-reloads when changed on disk; with local edits a conflict notice is shown instead."
     },
@@ -32817,7 +32832,7 @@
       "quote": "The **OpenAI** backend sends the audio to the OpenAI API",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:358",
+      "source": "src/shared/constants.ts:359",
       "match": "https://api.openai.com/v1/audio/transcriptions"
     },
     {
@@ -33405,7 +33420,7 @@
       "quote": "Select **Export as PNG** or **Export as PDF** to save a copy",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:190",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:160",
       "match": "tooltip: 'Export as PNG'",
       "test": "e2e/image-export.e2e.ts",
       "note": "Generic 'export' replaced with exact button labels."
@@ -33417,7 +33432,7 @@
       "quote": "**Export as PDF** to save a copy",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:198",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:168",
       "match": "tooltip: 'Export as PDF'",
       "note": "Exact label added."
     },
@@ -33428,7 +33443,7 @@
       "quote": "or **Copy to clipboard** to copy it",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:206",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:176",
       "match": "tooltip: 'Copy to clipboard'",
       "note": "Exact label added."
     },
@@ -33439,7 +33454,7 @@
       "quote": "The viewer refreshes files that change on disk and shows **Reloaded from disk**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:121",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:106",
       "match": "reloading: 'Reloaded from disk'",
       "note": "Refresh claim kept; added the status text the toolbar shows."
     },
@@ -33447,23 +33462,23 @@
       "id": "user-guide-how-to-view-and-export-images/11",
       "audience": "user",
       "doc": "docs/user-guide/how-to/view-and-export-images.md",
-      "quote": "a banner says \"This file was deleted on disk.\"",
+      "quote": "a banner says \"<file> was deleted, renamed or moved on disk.\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:144",
-      "match": "deleted: 'This file was deleted on disk.",
-      "note": "Added the banner text the user sees."
+      "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:103",
+      "match": "was deleted, renamed or moved on disk.",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-how-to-view-and-export-images/12",
       "audience": "user",
       "doc": "docs/user-guide/how-to/view-and-export-images.md",
-      "quote": "To check at once, select **Reload**.",
-      "status": "verified",
+      "quote": "To close the tab instead, select **Close tab**.",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:161",
-      "match": "label: 'Reload'",
-      "note": "Since #450 the viewer takes a returned file back on its own; Reload stays as the manual path."
+      "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:198",
+      "match": "actions: tab === 'editor' ? ['restore', 'close'] : ['close'],",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-how-to-view-and-export-images/13",
@@ -33514,7 +33529,7 @@
       "quote": "Opening a project that is already open in another window focuses that window instead.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:446",
+      "source": "src/main/services/ProjectService.ts:436",
       "match": "this.projectLockService.requestFocus(newProjectPath)",
       "note": "Reworded: the old text said a project 'focuses its existing window', unclear about the trigger (opening the project)."
     },
@@ -33525,7 +33540,7 @@
       "quote": "On macOS, the Erfana Dock menu also offers **New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:612",
+      "source": "src/main/index.ts:610",
       "match": "label: 'New Window'"
     },
     {
@@ -33535,7 +33550,7 @@
       "quote": "On Windows, select **New Window** from Erfana's taskbar jump list.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:629",
+      "source": "src/main/index.ts:627",
       "match": "title: 'New Window'"
     },
     {
@@ -33545,7 +33560,7 @@
       "quote": "Both routes open a separate Erfana instance, like **File > New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:632",
+      "source": "src/main/index.ts:630",
       "match": "args: '--new-window'"
     },
     {
@@ -33566,7 +33581,7 @@
       "quote": "3. Close the window.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:249",
+      "source": "src/main/index.ts:250",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })",
       "note": "Step said 'Close the window, or quit from the app menu' then promised a confirmation; only the window close handler sends quit:requested, so the step now names closing the window only."
     },
@@ -33643,7 +33658,7 @@
       "quote": "Quitting from the app menu, or with **File > Exit** on Windows, closes Erfana without a confirmation.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/index.ts:713",
+      "source": "src/main/index.ts:711",
       "match": "if (!quitGuard.handleBeforeQuit(event)) return",
       "test": "e2e/quit-shutdown.e2e.ts",
       "note": "Page implied quitting from the app menu shows the confirmation. before-quit is always prevented and runs the shutdown to app.exit(0); quit:requested is sent only from the window close handler (index.ts:248), so a menu quit never asks."
@@ -33676,7 +33691,7 @@
       "quote": "Both routes open a separate Erfana instance",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:614",
+      "source": "src/main/index.ts:612",
       "match": "spawnNewInstance()"
     },
     {
@@ -34410,7 +34425,7 @@
       "quote": "New Markdown tabs open in Preview mode",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:119",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:124",
       "match": "useState<ViewMode>('preview')"
     },
     {
@@ -34608,7 +34623,7 @@
       "quote": "Autosave writes after two seconds idle and during continued editing at least every 30 seconds",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }",
       "test": "e2e/editor-save.e2e.ts"
     },
@@ -34649,7 +34664,7 @@
       "quote": "a tab with unsaved edits asks you to choose **Reload from Disk** or **Keep My Version**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:56",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:74",
       "match": "Keep My Version",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Page implied the choice always appears; useFileWatcher.ts:340-347 shows it only with local changes, otherwise the file auto-reloads. Reload from Disk on line 48."
@@ -34661,8 +34676,8 @@
       "quote": "If the file changes outside Erfana, a tab with no unsaved edits reloads it automatically",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:337",
-      "match": "await reloadFromDisk(diskContent)",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:150",
+      "match": "if (force || !edited) {",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Added with the fix to 24: clean tabs auto-reload."
     },
@@ -34823,7 +34838,7 @@
       "quote": "select **Export as PNG**, **Export as PDF** or **Copy to clipboard** in its toolbar",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:190",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:160",
       "match": "tooltip: 'Export as PNG'",
       "note": "Was the vague 'toolbar export controls'; named the three tooltip labels."
     },
@@ -34834,7 +34849,7 @@
       "quote": "select **Export as PNG**, **Export as PDF** or **Copy to clipboard** in its toolbar",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:198",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:168",
       "match": "tooltip: 'Export as PDF'",
       "note": "Named the image PDF export label."
     },
@@ -34845,7 +34860,7 @@
       "quote": "select **Export as PNG**, **Export as PDF** or **Copy to clipboard** in its toolbar",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:206",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:176",
       "match": "tooltip: 'Copy to clipboard'",
       "note": "Named the image clipboard label."
     },
@@ -34928,7 +34943,7 @@
       "quote": "Markdown edits are saved two seconds after typing stops and at least every 30 seconds",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }"
     },
     {
@@ -34938,7 +34953,7 @@
       "quote": "Each save normally writes a temporary file first and swaps it in only when it is complete",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/utils/atomicWrite.ts:271",
+      "source": "src/main/utils/atomicWrite.ts:310",
       "match": "const tempPath = join(dirname(target), `${ATOMIC_TEMP_PREFIX}${randomUUID()}`)",
       "note": "Was absolute ('cannot leave a half-written file'); atomicWriteText falls back to an in-place write in some cases, so softened to 'normally'."
     },
@@ -34949,7 +34964,7 @@
       "quote": "Symlinked files and some network drives are written in place instead.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/utils/atomicWrite.ts:243",
+      "source": "src/main/utils/atomicWrite.ts:276",
       "match": "the target is a symlink: a rename would replace the link itself",
       "note": "Added: the in-place fallback cases (symlinks, network/FUSE mounts) were not mentioned. Network/FUSE in-place fallback is documented at atomicWrite.ts:252."
     },
@@ -34960,8 +34975,9 @@
       "quote": "Autosave waits while a tab shows the file-changed-on-disk notice",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return"
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:252",
+      "match": "if (!shouldAutosave(autosaveGate)) return",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-reference-files-erfana-keeps/05",
@@ -34970,7 +34986,7 @@
       "quote": "a save that failed is tried again on your next edit",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:254",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
       "match": "makes autosave back off until the next edit"
     },
     {
@@ -34980,7 +34996,7 @@
       "quote": "There is no autosave setting.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "enabled: true"
     },
     {
@@ -35001,7 +35017,7 @@
       "quote": "The disk-change notice offers **Reload from Disk** or **Keep My Version**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:48",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:66",
       "match": "Reload from Disk",
       "note": "Was unlabelled ('lets you choose the version to keep'); added the exact button labels (Keep My Version is on line 56)."
     },
@@ -35053,7 +35069,7 @@
       "quote": "If the settings file cannot be read at start-up, Erfana opens with default settings, says so",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:465",
+      "source": "src/main/index.ts:461",
       "match": "Your saved settings could not be loaded, so default settings are in use."
     },
     {
@@ -35116,7 +35132,7 @@
       "quote": "Erfana writes logs under `~/.erfana/logs/`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:38",
+      "source": "src/shared/constants.ts:39",
       "match": "export const LOGS_DIR_RELATIVE = '.erfana/logs'"
     },
     {
@@ -35291,7 +35307,7 @@
       "quote": "At most three pages run at once; other previews freeze to a still image until active again.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,"
     },
     {
@@ -35443,8 +35459,8 @@
       "quote": "A preview watches up to 16 files.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:550",
-      "match": "MAX_WATCHED_FILES: 16,"
+      "source": "src/shared/freshness/timingProfiles.ts:32",
+      "match": "preview: { perOwnerCap: 16, totalCap: 64 }"
     },
     {
       "id": "user-guide-reference-html-preview/21",
@@ -35779,7 +35795,7 @@
       "quote": "drag to pan, or double-select to toggle fit and 100%",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:360",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:370",
       "match": "onDoubleClick={transform.handleDoubleClick}"
     },
     {
@@ -35829,7 +35845,7 @@
       "quote": "<kbd>Esc</kbd> exits full screen",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:190",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:189",
       "match": "onEscape: fullScreen.close,",
       "test": "src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageViewerTransform.test.ts",
       "note": "Escape is routed to the full-screen overlay's close handler; the toolbar button also reads 'Exit full screen (Escape)' (ImageViewerToolbar.tsx:306)"
@@ -35852,7 +35868,7 @@
       "quote": "Save the image with **Export as PNG** or **Export as PDF**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:190",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:160",
       "match": "tooltip: 'Export as PNG',",
       "note": "Added the exact button labels (Export as PNG / Export as PDF)"
     },
@@ -35863,7 +35879,7 @@
       "quote": "or copy it with **Copy to clipboard**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:206",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:176",
       "match": "tooltip: 'Copy to clipboard',",
       "note": "Added the exact button label"
     },
@@ -35874,7 +35890,7 @@
       "quote": "shows **Reloaded from disk**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:121",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:106",
       "match": "reloading: 'Reloaded from disk',"
     },
     {
@@ -35891,11 +35907,12 @@
       "id": "user-guide-reference-image-viewer/17",
       "audience": "user",
       "doc": "docs/user-guide/reference/image-viewer.md",
-      "quote": "a banner with **Reload**",
-      "status": "verified",
+      "quote": "a banner with **Close tab**",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:161",
-      "match": "label: 'Reload',"
+      "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:93",
+      "match": "close: 'Close tab'",
+      "note": "Reworded by #478: the deleted notice offers Close tab, not Reload (S15, F14)"
     },
     {
       "id": "user-guide-reference-image-viewer/18",
@@ -35904,20 +35921,75 @@
       "quote": "Erfana watches at most 100 files at a time",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:32",
-      "match": "MAX_WATCHED_FILES = 100",
-      "note": "Was worded as a viewer-only '100-file watch cap'; the cap is app-wide, so reworded and moved under Limits"
+      "source": "src/shared/freshness/timingProfiles.ts:30",
+      "match": "tabs: { perOwnerCap: null, totalCap: 100 }",
+      "note": "Was worded as a viewer-only '100-file watch cap'; the cap is app-wide, so reworded and moved under Limits; Re-anchored by #478 (S8-S11 watch layer)"
     },
     {
       "id": "user-guide-reference-image-viewer/19",
       "audience": "user",
       "doc": "docs/user-guide/reference/image-viewer.md",
-      "quote": "past that, a banner says auto-refresh is unavailable",
+      "quote": "an image opened past that waits, but it still updates when you switch to it, and starts refreshing live when another tab closes",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:149",
-      "match": "Auto-refresh is unavailable – Erfana is watching its maximum of",
-      "note": "Added what the user sees when the cap is hit"
+      "source": "src/main/services/FileWatcherService.ts:293",
+      "match": "kind: 'started', stamp: reply.stamp",
+      "note": "Reworded by #478: past the cap a tab now waits in line (G9) instead of failing"
+    },
+    {
+      "id": "user-guide-reference-image-viewer/s21-01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/image-viewer.md",
+      "quote": "An image over 50 MB shows a notice and keeps the last picture",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/ipc/file-image-schema.ts:49",
+      "match": "export const IMAGE_READ_MAX_BYTES = 50 * 1024 * 1024",
+      "note": "Added by #478 S21: the notice names this limit."
+    },
+    {
+      "id": "user-guide-reference-image-viewer/s21-02",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/image-viewer.md",
+      "quote": "a notice says \"Auto-refresh stopped\" and **Reload** starts again",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:112",
+      "match": "Auto-refresh stopped for ${file}.",
+      "note": "Added by #478 S21."
+    },
+    {
+      "id": "user-guide-how-to-edit-and-preview-markdown/s21-01",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/edit-and-preview-markdown.md",
+      "quote": "works like **Keep My Version**: it does not postpone the choice",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:207",
+      "match": "dismissConflict: keepLocal,",
+      "note": "Added by #478 S21 (owner decision N6): Dismiss is Keep My Version."
+    },
+    {
+      "id": "user-guide-how-to-edit-and-preview-markdown/s21-02",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/edit-and-preview-markdown.md",
+      "quote": "becomes read-only and stops autosaving",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/autosaveGate.ts:32",
+      "match": "return !conflict && !deleted && !contentBlocked",
+      "note": "Added by #478 S21: a file the tab cannot show blocks autosave."
+    },
+    {
+      "id": "user-guide-how-to-edit-and-preview-markdown/s21-03",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/edit-and-preview-markdown.md",
+      "quote": "If the file becomes one Erfana cannot show – over 10 MB",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/freshness/timingProfiles.ts:170",
+      "match": "editorTextMaxBytes: 10 * 1024 * 1024",
+      "note": "Added by #478 S21 (owner decision Q2)."
     },
     {
       "id": "user-guide-reference-image-viewer/20",
@@ -35947,7 +36019,7 @@
       "quote": "**How to reach them:** Focus the image tab.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:177",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:176",
       "match": "return Boolean(panelRef.current?.contains(active) || overlayRef.current?.contains(active))",
       "note": "Key handler returns early unless focus is inside the panel or its full-screen overlay"
     },
@@ -36064,7 +36136,7 @@
       "quote": "At most 100 files can be imported at a time.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:128",
+      "source": "src/shared/constants.ts:129",
       "match": "MAX_BATCH_SIZE: 100"
     },
     {
@@ -36158,7 +36230,7 @@
       "quote": "over 50 MB",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:106",
+      "source": "src/shared/constants.ts:107",
       "match": "SIZE_WARNING_THRESHOLD: 50 * BYTES_PER_MB"
     },
     {
@@ -36168,7 +36240,7 @@
       "quote": "JPG, JPEG, PNG, GIF, BMP, TIFF, TIF and WebP work at startup",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:441",
+      "source": "src/shared/constants.ts:442",
       "match": "IMAGE_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp']"
     },
     {
@@ -36198,7 +36270,7 @@
       "quote": "DOC, DOCX, DOCM, ODT, RTF, PPT, PPTX, PPTM, ODP, XLS, XLSX, XLSM and ODS",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:438",
+      "source": "src/shared/constants.ts:439",
       "match": "'xls', 'xlsx', 'xlsm', 'ods'"
     },
     {
@@ -36353,7 +36425,7 @@
       "quote": "OpenAI sends audio to that service.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:358",
+      "source": "src/shared/constants.ts:359",
       "match": "OPENAI_API_URL: 'https://api.openai.com/v1/audio/transcriptions'"
     },
     {
@@ -36404,7 +36476,7 @@
       "quote": "Recordings longer than 8 minutes are split into chunks.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/constants.ts:344",
+      "source": "src/shared/constants.ts:345",
       "match": "CHUNK_BOUNDARY_SECONDS: 8 * 60",
       "note": "Added the 8-minute threshold."
     },
@@ -37096,7 +37168,7 @@
       "quote": "| Image pan; leave full screen | Arrow keys; <kbd>Esc</kbd> | Same |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:190",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:189",
       "match": "onEscape: fullScreen.close",
       "note": "Ledger fix: the logic line names the action \"fullscreen\" (toggle); the wiring shows Escape closes full screen, matching the page."
     },
@@ -37617,10 +37689,10 @@
       "quote": "It updates on its own shortly after the image file changes on disk",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:71",
-      "match": "export const MARKDOWN_IMAGE_SETTLE_MS = 300",
+      "source": "src/renderer/src/components/Editor/markdownImageStore.ts:70",
+      "match": "const SETTLE_MS = TIMING_PROFILES.dependent.settleMs",
       "test": "e2e/preview-images.e2e.ts",
-      "note": "Said 'within about a second'; refresh settles 300 ms after the last change but a burst can postpone it up to 2 s, so no fixed time is promised."
+      "note": "Said 'within about a second'; a followed image is read on its change event, the fallback refresh settles 75 ms (the dependent profile) after the last change and a burst can postpone it up to 2 s, so no fixed time is promised."
     },
     {
       "id": "user-guide-reference-markdown-preview/16",
@@ -37629,7 +37701,7 @@
       "quote": "PNG, JPEG, GIF, WebP and SVG images up to 16 MB are shown",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/markdown-image-schema.ts:37",
+      "source": "src/shared/ipc/markdown-image-schema.ts:38",
       "match": "['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']"
     },
     {
@@ -37639,7 +37711,7 @@
       "quote": "images up to 16 MB are shown",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/markdown-image-schema.ts:51",
+      "source": "src/shared/ipc/markdown-image-schema.ts:52",
       "match": "MARKDOWN_IMAGE_MAX_BYTES = 16 * 1024 * 1024"
     },
     {
@@ -37649,7 +37721,7 @@
       "quote": "up to 64 per document",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/markdown-image-schema.ts:44",
+      "source": "src/shared/ipc/markdown-image-schema.ts:45",
       "match": "MAX_MARKDOWN_IMAGES_PER_DOCUMENT = 64"
     },
     {
@@ -37877,7 +37949,7 @@
       "quote": "Opening a project that is already open in another window focuses that window instead.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:446",
+      "source": "src/main/services/ProjectService.ts:436",
       "match": "this.projectLockService.requestFocus(newProjectPath)",
       "note": "Was worded as if New Window itself focused a window; the focus happens when opening a project already locked by another window."
     },
@@ -38674,7 +38746,7 @@
       "quote": "(such as `dist`, `build`, `.venv`, `.next` and `coverage`) still appear",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:166",
+      "source": "src/shared/constants.ts:167",
       "match": "'dist',"
     },
     {
@@ -39281,7 +39353,7 @@
       "quote": "| **Logs folder** and **Open** | `~/.erfana/logs/` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:38",
+      "source": "src/shared/constants.ts:39",
       "match": "LOGS_DIR_RELATIVE = '.erfana/logs'"
     },
     {
@@ -39454,7 +39526,7 @@
       "quote": "JPG, JPEG, PNG, GIF, BMP, TIFF, TIF and WebP import with no extra tool",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:441",
+      "source": "src/shared/constants.ts:442",
       "match": "IMAGE_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp']"
     },
     {
@@ -39885,7 +39957,7 @@
       "quote": "the log gets a warning naming the file (`global` or `project`) and the entry's position in the list",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:141",
+      "source": "src/main/services/ProjectService.ts:142",
       "match": "logger.warn('Project switch: files.exclude entries rejected', {"
     },
     {
@@ -39936,7 +40008,7 @@
       "quote": "choosing the project that is already open does not re-read its settings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:432",
+      "source": "src/main/services/ProjectService.ts:422",
       "match": "const isSame = await step(this.isSameProject(openSnapshot, newProjectPath), 'Same-project check')"
     },
     {
@@ -39967,10 +40039,10 @@
       "quote": "A file inside an excluded folder that is already open in a tab keeps refreshing when it changes on disk.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/FileWatcherService.ts:197",
-      "match": "return createSingleFileWatcher(filePath, {",
+      "source": "src/main/services/watcher/FileWatchCore.ts:148",
+      "match": "createSingleFileWatcher(",
       "test": "e2e/guide-tasks/claims-user-3.guide.ts",
-      "note": "Real-app test: scratch/ excluded, scratch/note.md opened from a Markdown preview link, rewritten on disk, the tab shows the new text."
+      "note": "Real-app test: scratch/ excluded, scratch/note.md opened from a Markdown preview link, rewritten on disk, the tab shows the new text.; Re-anchored by #478 (S8-S11 watch layer)"
     },
     {
       "id": "user-guide-reference-settings/80",
@@ -40000,7 +40072,7 @@
       "quote": "which sends audio to the OpenAI API",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:358",
+      "source": "src/shared/constants.ts:359",
       "match": "https://api.openai.com/v1/audio/transcriptions"
     },
     {
@@ -40130,7 +40202,7 @@
       "quote": "The global file is read when Erfana starts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:461",
+      "source": "src/main/index.ts:457",
       "match": "await globalSettingsService.initialize()"
     },
     {
@@ -40679,7 +40751,7 @@
       "quote": "up to five recent projects",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:24",
+      "source": "src/shared/constants.ts:25",
       "match": "export const MAX_RECENT_PROJECTS = 5"
     },
     {
@@ -40824,7 +40896,7 @@
       "quote": "editor and image tabs show **(deleted)** when their files disappear from disk",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:620",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:604",
       "match": "formatTabTitle(fileName, titleModified, isFileDeleted)",
       "test": "e2e/deleted-folder-tabs.e2e.ts",
       "note": "Page claimed HTML-preview tabs show (deleted); HtmlPreviewPanel sets a plain basename title and shows a banner instead. Only the Markdown editor and image viewer use formatTabTitle with the deleted flag."
@@ -40928,7 +41000,7 @@
       "quote": "editor and image tabs show **(deleted)**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:214",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:213",
       "match": "formatTabTitle(getBasename(filePath) || 'Image', false, watch.isFileDeleted)"
     },
     {
@@ -40989,7 +41061,7 @@
       "quote": "Open a Markdown file, the project tree, or a Claude Code terminal session respectively",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:724",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:704",
       "match": "<DocumentStatsBar stats={documentStats} selectedText={selectedText} />"
     },
     {
@@ -41379,7 +41451,7 @@
       "quote": "Select **Reload from Disk** to use the external version",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:48",
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:66",
       "match": "Reload from Disk"
     },
     {
@@ -41389,8 +41461,9 @@
       "quote": "**Keep My Version** to retain the editor buffer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:56",
-      "match": "Keep My Version"
+      "source": "src/renderer/src/components/FileConflictNotification/FileConflictNotification.tsx:74",
+      "match": "Keep My Version",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-reference-troubleshooting/37",
@@ -41399,8 +41472,9 @@
       "quote": "autosave waits for your choice instead of writing over the newer file",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return"
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:252",
+      "match": "if (!shouldAutosave(autosaveGate)) return",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-reference-troubleshooting/38",
@@ -41429,7 +41503,7 @@
       "quote": "import a Word, PowerPoint, Excel or OpenDocument file",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:436",
+      "source": "src/shared/constants.ts:437",
       "match": "'doc', 'docx', 'docm', 'odt', 'rtf',"
     },
     {
@@ -41552,7 +41626,7 @@
       "quote": "It appears when you open a folder from the dialog or the recent list.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/services/ProjectService.ts:411",
+      "source": "src/main/services/ProjectService.ts:401",
       "match": "assertAcceptableProjectRoot(realRoot)",
       "note": "No drop-a-folder-to-open-project route exists (folder drops on the tree are ignored), so \"or by dropping it\" was removed. Real-app test: dialog with the drive root shows \"System directories cannot be opened as projects\"; a recent project replaced by a link to the drive root shows \"This directory link points to a protected location\".",
       "test": "e2e/guide-tasks/claims-user-3.guide.ts"
@@ -41704,8 +41778,9 @@
       "quote": "A conflict notice appears if the file changed outside Erfana while the editor has local changes.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:331",
-      "match": "if (hasLocalChangesRef.current) {"
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:159",
+      "match": "return 'held'",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "user-guide-reference-troubleshooting/68",
@@ -41815,7 +41890,7 @@
       "quote": "The Erfana taskbar jump list also has **New Window**, which opens a separate instance.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:629",
+      "source": "src/main/index.ts:627",
       "match": "title: 'New Window',"
     },
     {
@@ -41949,7 +42024,7 @@
       "quote": "OpenAI remains an option when configured with a key; it sends audio to the API.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:358",
+      "source": "src/shared/constants.ts:359",
       "match": "OPENAI_API_URL: 'https://api.openai.com/v1/audio/transcriptions'"
     },
     {
@@ -42727,7 +42802,7 @@
       "quote": "A GIF with more than one frame exports its first frame only.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:237",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:207",
       "match": "`first frame of ${frameCount}`",
       "note": "Added for #73: multi-frame GIF exports the first frame (describeSelection, ImageExportService.ts:406)."
     },
@@ -44265,31 +44340,34 @@
       "id": "docs-ipc-patterns/t01",
       "audience": "developer",
       "doc": "docs/ipc-patterns.md",
-      "quote": "| `file-watch:start` |",
-      "status": "verified",
+      "quote": "| `file-watch:subscribe` |",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-watcher-handlers.ts:14",
-      "match": "'file-watch:start'"
+      "source": "src/shared/ipc/file-watch-channels.ts:15",
+      "match": "subscribe: 'file-watch:subscribe',",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-ipc-patterns/t02",
       "audience": "developer",
       "doc": "docs/ipc-patterns.md",
-      "quote": "| `file-watch:resume` |",
-      "status": "verified",
+      "quote": "| `file-watch:resumeWatch` |",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-watcher-handlers.ts:88",
-      "match": "'file-watch:resume'"
+      "source": "src/shared/ipc/file-watch-channels.ts:21",
+      "match": "resumeWatch: 'file-watch:resumeWatch',",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-ipc-patterns/t03",
       "audience": "developer",
       "doc": "docs/ipc-patterns.md",
-      "quote": "| `file-watch:error` |",
-      "status": "verified",
+      "quote": "| `file-watch:event` |",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:248",
-      "match": "'file-watch:error'"
+      "source": "src/shared/ipc/file-watch-channels.ts:31",
+      "match": "event: 'file-watch:event',",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-ipc-patterns/t04",
@@ -44538,7 +44616,7 @@
       "quote": "registered through `registry.ts` (never `ipcMain` directly)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:506",
+      "source": "src/main/index.ts:504",
       "match": "`src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being"
     },
     {
@@ -44548,7 +44626,7 @@
       "quote": "A channel that takes a path registers through `registerConfinedHandle` instead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/confinement/registerConfinedHandle.ts:175",
+      "source": "src/main/ipc/confinement/registerConfinedHandle.ts:159",
       "match": "export function registerConfinedHandle<"
     },
     {
@@ -44558,7 +44636,7 @@
       "quote": "3. Register handler in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:509",
+      "source": "src/main/index.ts:507",
       "match": "registerFileHandlers()"
     },
     {
@@ -44688,18 +44766,19 @@
       "quote": "- Iterate `BrowserWindow.getAllWindows()`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:155",
+      "source": "src/main/services/ProjectService.ts:156",
       "match": "const windows = BrowserWindow.getAllWindows()"
     },
     {
       "id": "docs-ipc-patterns/m17",
       "audience": "developer",
       "doc": "docs/ipc-patterns.md",
-      "quote": "- File watcher: src/main/services/FileWatcherService.ts (`switchVersion` guards change/delete/notify)",
-      "status": "verified",
+      "quote": "- File watcher: src/main/services/FileWatcherService.ts (each subscription records the session generation; a stale one is refused before its answer, and a project switch ends older ones – #478)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:36",
-      "match": "private switchVersion = 0"
+      "source": "src/main/services/FileWatcherService.ts:209",
+      "match": "if (sub.generation !== this.generation()) return 'PROJECT_CHANGED'",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-ipc-patterns/m18",
@@ -44888,7 +44967,7 @@
       "quote": "`ProjectService` owns a `ProjectSessionStore` and exposes it read-only as `projectService.session`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:175",
+      "source": "src/main/services/ProjectService.ts:176",
       "match": "readonly session: ProjectSession = this.sessionStore"
     },
     {
@@ -44918,7 +44997,7 @@
       "quote": "`ctx.reason` is `'user'`, `'project-deleted'`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:67",
+      "source": "src/main/services/ProjectService.ts:68",
       "match": "reason: 'user' | 'project-deleted' | 'window-destroyed'"
     },
     {
@@ -44928,7 +45007,7 @@
       "quote": "Every open, switch and close runs on one queue (`serialise`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:632",
+      "source": "src/main/services/ProjectService.ts:628",
       "match": "return this.serialise(() => this.performClose(ctx))"
     },
     {
@@ -44938,7 +45017,7 @@
       "quote": "Each I/O step of a transition has a 15 s limit (`TRANSITION_STEP_TIMEOUT_MS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:78",
+      "source": "src/main/services/ProjectService.ts:79",
       "match": "const TRANSITION_STEP_TIMEOUT_MS = 15_000"
     },
     {
@@ -45098,7 +45177,7 @@
       "quote": "(register via `registerClipboardHandlers()` at startup)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:529",
+      "source": "src/main/index.ts:527",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -45199,7 +45278,7 @@
       "quote": "rejects files above `IMPORT.SIZE_HARD_LIMIT` (250 MB)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:115",
+      "source": "src/shared/constants.ts:116",
       "match": "SIZE_HARD_LIMIT: 250 * BYTES_PER_MB,"
     },
     {
@@ -45319,8 +45398,8 @@
       "quote": "3. `stat` against `MAX_IMAGE_SIZE` (50 MB, imported from `file/imageRead.ts`, not redeclared)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/file/imageRead.ts:57",
-      "match": "export const MAX_IMAGE_SIZE = 50 * 1024 * 1024 // 50 MB"
+      "source": "src/shared/ipc/file-image-schema.ts:49",
+      "match": "export const IMAGE_READ_MAX_BYTES = 50 * 1024 * 1024"
     },
     {
       "id": "docs-api-services-features/m18",
@@ -45891,7 +45970,7 @@
       "quote": "tosaveIndicator()`, `reloadIndicator()`), the s",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/editor-panel.page.ts:163",
+      "source": "e2e/pages/editor-panel.page.ts:190",
       "match": "reloadIndicator(): Locator {"
     },
     {
@@ -45931,7 +46010,7 @@
       "quote": "ctExportBusy()` and `expectExportAnnouncement()` |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/image-viewer.page.ts:438",
+      "source": "e2e/pages/image-viewer.page.ts:452",
       "match": "async expectExportAnnouncement(text: string, timeout = this."
     },
     {
@@ -46072,38 +46151,41 @@
       "quote": "(`SINGLE_FILE_WATCH_OPTIONS` + `createSingleFileWatcher`, #70)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/singleFileWatch.ts:73",
+      "source": "src/main/services/watcher/singleFileWatch.ts:78",
       "match": "export function createSingleFileWatcher("
     },
     {
       "id": "docs-file-watching-README/m02",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "1. **`isSavingRef` guard**",
-      "status": "verified",
+      "quote": "1. **The pause belongs to the save**",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:150",
-      "match": "const isSavingRef = useRef(false)"
+      "source": "src/shared/freshness/saveAddOn.ts:74",
+      "match": "if (watchId !== null) await source.pause(watchId)",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/m03",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "Compares incoming file content against `pendingSavedContentsRef`, a `Set` of recently saved content strings",
-      "status": "verified",
+      "quote": "Only an autosave sends `expectedStamp`, and never in the deleted state",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:162",
-      "match": "const pendingSavedContentsRef = useRef<Set<string>>(new Set())"
+      "source": "src/shared/freshness/saveAddOn.ts:82",
+      "match": "...(expectedStamp !== undefined ? { expectedStamp } : {}),",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/m04",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "2. **Content comparison (`isEchoEvent`)**",
-      "status": "verified",
+      "quote": "2. **Own-save identity is the written stamp**",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:40",
-      "match": "export function isEchoEvent("
+      "source": "src/shared/freshness/saveAddOn.ts:84",
+      "match": "if (reply.status === 'written') tracker.adoptStamp(reply.stamp)",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/m05",
@@ -46112,78 +46194,86 @@
       "quote": "3. **`hasLocalChangesRef`**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:154",
-      "match": "const hasLocalChangesRef = useRef(hasLocalChanges)"
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:109",
+      "match": "const hasLocalChangesRef = useLatestRef(hasLocalChanges)",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/m06",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "`subscribers: SubscriberCounter` (`watcher/SubscriberCounter.ts`), a",
-      "status": "verified",
+      "quote": "Each consumer subscribes with a `watchId` of its own",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/watcher/SubscriberCounter.ts:31",
-      "match": "private readonly counts: Map<number, number> = new Map()"
+      "source": "src/main/services/FileWatcherService.ts:85",
+      "match": "if (this.subscriptions.get(sub.key)) return refused('DUPLICATE_ID')",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/m07",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "| `removeAll(id)` |",
-      "status": "verified",
+      "quote": "a window that closes or reloads drops all of its subscriptions together",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/watcher/SubscriberCounter.ts:84",
-      "match": "removeAll(webContentsId: number): number {"
+      "source": "src/main/services/FileWatcherService.ts:249",
+      "match": "async cleanupForWebContentsId(webContentsId: number): Promise<void> {",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/m08",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
       "quote": "| `has` / `size` / `countFor` / `totalSubscriptions` / `ids()` |",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/main/services/watcher/SubscriberCounter.ts:105",
-      "match": "get totalSubscriptions(): number {"
+      "match": "get totalSubscriptions(): number {",
+      "note": "Taken off the page by #478 S16: SubscriberCounter and fileWatchSlot were deleted with the legacy watch API"
     },
     {
       "id": "docs-file-watching-README/m09",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "That is why `watchFile` checks",
-      "status": "verified",
+      "quote": "That is why the bucket check is",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:138",
-      "match": "Joining an existing watch is decided BEFORE the MAX_WATCHED_FILES cap"
+      "source": "src/main/services/FileWatcherService.ts:91",
+      "match": "this.entries.has(entryKey) ? entryKey : null",
+      "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
     {
       "id": "docs-file-watching-README/m10",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
       "quote": "acquire (leaks a slot out of the 100 available until `start` refuses for every",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:32",
-      "match": "private readonly MAX_WATCHED_FILES = 100"
+      "source": "src/shared/freshness/timingProfiles.ts:30",
+      "match": "tabs: { perOwnerCap: null, totalCap: 100 }",
+      "note": "Taken off the page by #478 S16: SubscriberCounter and fileWatchSlot were deleted with the legacy watch API"
     },
     {
       "id": "docs-file-watching-README/m11",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
-      "quote": "`classifyWatchStartFailure` maps a refused `start` to `'limit'` only for the",
-      "status": "verified",
+      "quote": "`queued` tab shows the watch-limit notice",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileChangeSubscription.ts:43",
-      "match": "export type FileWatchUnavailableReason = 'limit' | 'watcher-error'"
+      "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:217",
+      "match": "kind: 'queued',",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-file-watching-README/m12",
       "audience": "developer",
       "doc": "docs/file-watching/README.md",
       "quote": "The slot pairs an `isHeld` flag with a serialised",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/renderer/src/hooks/fileWatchSlot.ts:41",
-      "match": "isHeld: boolean"
+      "match": "isHeld: boolean",
+      "note": "Taken off the page by #478 S16: SubscriberCounter and fileWatchSlot were deleted with the legacy watch API"
     },
     {
       "id": "docs-file-watching-README/m13",
@@ -46802,7 +46892,7 @@
       "quote": "Monaco with live preview, scroll sync",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:91",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:92",
       "match": "Bidirectional scroll synchronization"
     },
     {
@@ -46842,7 +46932,7 @@
       "quote": "unified in-file search (Cmd/Ctrl+F)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:172",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:176",
       "match": "Global keyboard shortcuts for search (Cmd/Ctrl+F)"
     },
     {
@@ -46972,7 +47062,7 @@
       "quote": "`.git/` events are filtered in favor of `GitWatcherService`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:161",
+      "source": "src/shared/constants.ts:162",
       "match": "Git state reaches the renderer via GitWatcherService"
     },
     {
@@ -47151,7 +47241,7 @@
       "quote": "(watcher ignore, tree visibility)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:161",
+      "source": "src/shared/constants.ts:162",
       "match": "tree.hiddenPatterns"
     },
     {
@@ -47354,7 +47444,7 @@
       "quote": "the swap is decode-first",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageSource.ts:156",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageSource.ts:175",
       "match": "Prefers `HTMLImageElement.decode()`"
     },
     {
@@ -47364,7 +47454,7 @@
       "quote": "behind a banner with a **Reload** action",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:161",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:131",
       "match": "label: 'Reload',"
     },
     {
@@ -47394,7 +47484,7 @@
       "quote": "Import audio (MP3, WAV, M4A, OGG, FLAC)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:366",
+      "source": "src/shared/constants.ts:367",
       "match": "SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a', 'ogg', 'flac']"
     },
     {
@@ -47404,7 +47494,7 @@
       "quote": "video (MP4, MOV, AVI, MKV, WebM, FLV, WMV)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:415",
+      "source": "src/shared/constants.ts:416",
       "match": "SUPPORTED_EXTENSIONS: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv']"
     },
     {
@@ -47414,7 +47504,7 @@
       "quote": "model selection: tiny/base/small/medium/large",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:387",
+      "source": "src/shared/constants.ts:388",
       "match": "SUPPORTED_MODELS: ['tiny', 'base', 'small', 'medium', 'large']"
     },
     {
@@ -47735,8 +47825,9 @@
       "quote": "if auto-refresh is unavailable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:31",
-      "match": "Why auto-refresh is unavailable for a file."
+      "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:112",
+      "match": "Auto-refresh stopped for",
+      "note": "Re-anchored by #478 (S12-S16 legacy watch API)"
     },
     {
       "id": "docs-features-README/t95",
@@ -49030,11 +49121,12 @@
       "id": "designs-comments-comments-v2/t18",
       "audience": "developer",
       "doc": "docs/designs/comments/comments-v2.md",
-      "quote": "the 'changed on disk' conflict (MarkdownEditorPanel.tsx:673-674)",
-      "status": "verified",
+      "quote": "the 'changed on disk' conflict (MarkdownEditorPanel.tsx:654-660)",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:671",
-      "match": "{externalChangeDetected && ("
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:654",
+      "match": "<FreshnessNotice",
+      "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
     {
       "id": "designs-comments-comments-v2/t19",
@@ -49818,8 +49910,8 @@
       "quote": "a file stamped in the future does not count as a save",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/PreviewWatchPool.ts:36",
-      "match": "{@link WATCH_CATCH_UP_SLACK_MS} either side: a file stamped in the future"
+      "source": "src/main/services/preview/PreviewWatchPool.ts:42",
+      "match": "either side, so a file stamped in the future"
     },
     {
       "id": "docs-html-preview-README/t41",
@@ -50089,7 +50181,7 @@
       "quote": "The preview does not show a file that large, so there is nothing to comment on.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:505",
+      "source": "src/shared/constants.ts:506",
       "match": "MAX_ASSET_BYTES: 25 * 1024 * 1024,"
     },
     {
@@ -50332,7 +50424,7 @@
       "quote": "// sandbox: true is the default since Electron 20 (2022)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:217",
+      "source": "src/main/index.ts:218",
       "match": "// sandbox: true is the default since Electron 20 (2022)"
     },
     {
@@ -50342,7 +50434,7 @@
       "quote": "  webgl: true",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:221",
+      "source": "src/main/index.ts:222",
       "match": "webgl: true"
     },
     {
@@ -50474,7 +50566,7 @@
       "quote": "without the e2e test-hooks flag (`ERFANA_E2E_TEST_HOOKS=1`), which has the same `!app.isPackaged` gate",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:191",
+      "source": "src/main/index.ts:192",
       "match": "process.env.ERFANA_E2E_TEST_HOOKS === '1'",
       "note": "Said buildAdditionalArguments otherwise returns []; it also appends TEST_HOOKS_ARG under ERFANA_E2E_TEST_HOOKS=1 behind the same unpackaged gate."
     },
@@ -50759,7 +50851,7 @@
       "quote": "renders local images as base64 via `FileService.readImage`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/file/imageRead.ts:134",
+      "source": "src/main/services/file/imageRead.ts:172",
       "match": "dataUrl: `data:${mimeType};base64,"
     },
     {
@@ -51032,7 +51124,7 @@
       "quote": "is refused as \"permission denied\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/confinement/resolveConfinedPath.ts:377",
+      "source": "src/main/ipc/confinement/resolveConfinedPath.ts:381",
       "match": "throw new ConfinementError('PERMISSION_DENIED')"
     },
     {
@@ -51152,7 +51244,7 @@
       "quote": "**Status**: ✅ DOUBLE-GATED – inert in any packaged build",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:188",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -51643,7 +51735,7 @@
       "quote": "capped by `PREVIEW.MAX_LIVE_VIEWS`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:539",
+      "source": "src/shared/constants.ts:540",
       "match": "MAX_LIVE_VIEWS: 3,"
     },
     {
@@ -51744,7 +51836,7 @@
       "quote": "up to the 4 MiB read bound",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:512",
+      "source": "src/shared/constants.ts:513",
       "match": "MAX_ENTRY_HTML_BYTES: 4 * 1024 * 1024,"
     },
     {
@@ -51764,7 +51856,7 @@
       "quote": "and gives it 300 ms",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:632",
+      "source": "src/shared/constants.ts:626",
       "match": "BOUNDS_ACK_TIMEOUT_MS: 300,"
     },
     {
@@ -52335,8 +52427,9 @@
       "quote": "After a real delete, `FileWatcherService` drops the map entry.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/atomicRearm.ts:114",
-      "match": "deps.discardWatch(filePath, watched)"
+      "source": "src/main/services/watcher/atomicRearm.ts:94",
+      "match": "deps.discardWatch(watched)",
+      "note": "Re-anchored by #478 (S8-S11 watch layer)"
     },
     {
       "id": "docs-technical-debt/s07",
@@ -52345,8 +52438,9 @@
       "quote": "The 100 ms atomic-save window is a bound, not a guarantee.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:406",
-      "match": "detector's 100 ms window"
+      "source": "src/main/services/watcher/AtomicSaveDetector.ts:41",
+      "match": "ATOMIC_SAVE_DELAY_MS = 100",
+      "note": "Re-anchored by #478 (S8-S11 watch layer)"
     },
     {
       "id": "docs-technical-debt/s08",
@@ -52676,7 +52770,7 @@
       "quote": "the older `PREVIEW` block stays in `constants.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:503",
+      "source": "src/shared/constants.ts:504",
       "match": "export const PREVIEW = {"
     },
     {
@@ -52696,7 +52790,7 @@
       "quote": "`PreviewEmitters.resizeHold` and `pageChanged`, `IPreviewStillFrameCache.markStale`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/preview-types.ts:256",
+      "source": "src/shared/ipc/preview-types.ts:262",
       "match": "resizeHold?(panelId: string, held: boolean): void"
     },
     {
@@ -53853,7 +53947,7 @@
       "quote": "returns early when `isRendererGone(mainWindow)` is true",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:246",
+      "source": "src/main/index.ts:247",
       "match": "if (isRendererGone(mainWindow)) return",
       "note": "Fix line described a webContents.isDestroyed() guard; the close handler now uses isRendererGone (destroyed or crashed, #60)."
     },
@@ -53864,7 +53958,7 @@
       "quote": "before it calls `webContents.send('quit:requested', …)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:249",
+      "source": "src/main/index.ts:250",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {
@@ -54593,7 +54687,7 @@
       "quote": "`src/shared/constants.ts` — Phase 4 (`LOCAL_WHISPER` folder names",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:375",
+      "source": "src/shared/constants.ts:376",
       "match": "export const LOCAL_WHISPER = {"
     },
     {
@@ -54643,7 +54737,7 @@
       "quote": "configurable `WINDOW_PICKER.MAX_SOURCES`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/constants.ts:308",
+      "source": "src/shared/constants.ts:309",
       "match": "MAX_SOURCES: 64",
       "note": "Still a fixed constant, so the follow-up is still open"
     },
@@ -55125,7 +55219,7 @@
       "quote": "a Markdown comment's write is refused for a tab in any window",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/FileCommentService.ts:163",
+      "source": "src/main/services/comments/FileCommentService.ts:161",
       "match": "hasUnsavedSource: realPath => deps.unsaved.hasAny(realPath)",
       "note": "Said the guard sees every window; the HTML write asks its own window only (previewSaveFlows.ts, deps.shared.unsaved.has)."
     },
@@ -55166,8 +55260,8 @@
       "quote": "at most 64 watched files for the whole process",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/fileCommentWatches.ts:22",
-      "match": "export const FILE_COMMENT_WATCHES_MAX = 64"
+      "source": "src/shared/freshness/timingProfiles.ts:36",
+      "match": "comments: { perOwnerCap: null, totalCap: 64 }"
     },
     {
       "id": "docs-security/s024-05",
@@ -55867,9 +55961,9 @@
       "quote": "the viewer shows it again on its own within about 2 seconds",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileChangeSubscription.ts:268",
-      "match": "useDeletedFileProbe(filePath, isFileDeleted, async () => {",
-      "note": "#450: a deleted image tab probes the disk (every 2 s, DELETED_FILE_PROBE_INTERVAL_MS) and refreshes when the file is back."
+      "source": "src/shared/freshness/timingProfiles.ts:49",
+      "match": "maxMs: 2_000 }",
+      "note": "#450: a deleted image tab probes the disk (backs off to every 2 s, DELETED_PROBE_BACKOFF) and refreshes when the file is back."
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/20",
@@ -55878,8 +55972,8 @@
       "quote": "If the file is deleted on disk, the tab says so and autosave waits.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:252",
+      "match": "if (!shouldAutosave(autosaveGate)) return",
       "note": "#450: autosave holds while the tab shows its file as deleted."
     },
     {
@@ -55889,9 +55983,9 @@
       "quote": "a tab without edits shows it again on its own",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/takeBackReturnedFile.ts:75",
-      "match": "await deps.reload(diskContent)",
-      "note": "#450: the probe reloads a returned file into an unedited tab."
+      "source": "src/shared/freshness/FreshnessTracker.ts:492",
+      "match": "if (result === 'applied') {",
+      "note": "#450/#478: the file-back catch-up read applies a returned file to an unedited tab."
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/22",
@@ -55900,9 +55994,9 @@
       "quote": "If you typed meanwhile, choose **Reload from Disk** or **Keep My Version**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/takeBackReturnedFile.ts:82",
-      "match": "deps.showConflict()",
-      "note": "#450: an edited tab gets the file-changed-on-disk conflict bar."
+      "source": "src/shared/freshness/FreshnessTracker.ts:498",
+      "match": "this.setContent({ kind: 'changed', mode: 'held'",
+      "note": "#450/#478: an edited tab holds the returned file and shows the file-changed-on-disk conflict bar."
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/23",
@@ -55911,8 +56005,8 @@
       "quote": "To write your version back while the file is gone, press <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd>.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:314",
-      "match": "if (shouldRecreateParentDirs(trigger, isFileDeleted)) {",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:310",
+      "match": "...(shouldRecreateParentDirs(trigger, isFileDeleted) ? { createParentDirs: true as const } : {})",
       "note": "#450: the tab's own save writes the file back (and recreates its folder) while it is deleted; autosave does not."
     },
     {
@@ -55922,8 +56016,8 @@
       "quote": "While a tab shows its file as deleted, autosave waits;",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:252",
+      "match": "if (!shouldAutosave(autosaveGate)) return",
       "note": "#450: autosave is skipped while the tab is in the deleted state."
     },
     {
@@ -55933,8 +56027,8 @@
       "quote": "<kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> still writes the file back.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:314",
-      "match": "if (shouldRecreateParentDirs(trigger, isFileDeleted)) {",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:310",
+      "match": "...(shouldRecreateParentDirs(trigger, isFileDeleted) ? { createParentDirs: true as const } : {})",
       "note": "#450: the tab's own save writes a deleted file back."
     },
     {

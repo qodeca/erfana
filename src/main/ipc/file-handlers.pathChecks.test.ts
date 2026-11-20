@@ -223,13 +223,18 @@ describe('file:* path checks', () => {
     })
 
     it('every confined channel registered by production code checks the real file system', async () => {
-      // The Markdown image channel takes an injectable seam for its tests; the
-      // production registration must not use it
+      // The Markdown image and file-watch channels take an injectable seam for
+      // their tests; the production registrations must not use it
       const { projectService } = await import('./file-handlers')
       const { registerMarkdownImageHandlers } = await import('./markdown-image-handlers')
+      const { registerFileWatcherHandlers } = await import('./file-watcher-handlers')
       registerMarkdownImageHandlers(projectService.session)
+      registerFileWatcherHandlers(projectService.session)
       const deps = getConfinedChannelDeps()
       expect(deps.has('markdown-image:read')).toBe(true)
+      for (const channel of ['subscribe', 'probe', 'readText', 'writeText']) {
+        expect(deps.has(`file-watch:${channel}`), channel).toBe(true)
+      }
       for (const [channel, used] of deps) {
         expect(used, channel).toBe(defaultConfinementDeps)
       }

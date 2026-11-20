@@ -81,8 +81,10 @@ describe('ProjectService – main-owned project session', () => {
       setPathFilter: vi.fn()
     } as any
     fileWatcherService = {
-      setProjectPath: vi.fn(),
-      stopAll: vi.fn(() => Promise.resolve())
+      bindSession: vi.fn(),
+      suspendAll: vi.fn(() => Promise.resolve()),
+      resumeSuspended: vi.fn(() => Promise.resolve()),
+      endSuspended: vi.fn(() => Promise.resolve())
     } as any
     directoryWatcherService = {
       setProjectPath: vi.fn(),
@@ -335,9 +337,11 @@ describe('ProjectService – main-owned project session', () => {
       await service.switchProject(PROJECT_A)
       await service.close({ senderId: null, reason: 'window-destroyed' })
 
-      for (const target of [fileService, fileWatcherService, directoryWatcherService]) {
+      for (const target of [fileService, directoryWatcherService]) {
         expect(vi.mocked(target.setProjectPath).mock.calls.map(([p]) => p)).toEqual([PROJECT_A, ''])
       }
+      // The file watcher reads the session itself (#478, decision 13)
+      expect(fileWatcherService.bindSession).toHaveBeenCalledWith(service.session)
     })
 
     it('stops notifying a listener once it unsubscribes, and survives one that throws', async () => {
@@ -375,7 +379,9 @@ describe('ProjectService – main-owned project session', () => {
       await service.close({ senderId: 1, reason: 'user' })
 
       expect(lockService.releaseLock).toHaveBeenCalledWith(PROJECT_A)
-      expect(fileWatcherService.stopAll).toHaveBeenCalledTimes(2)
+      // Suspended at the open and at the close; the close ends them as project-closed
+      expect(fileWatcherService.suspendAll).toHaveBeenCalledTimes(2)
+      expect(fileWatcherService.endSuspended).toHaveBeenLastCalledWith(2, 'project-closed')
       expect(settingsService.clearLastProjectPath).toHaveBeenCalledTimes(1)
       expect(service.session.current()).toBeNull()
     })

@@ -14,19 +14,28 @@ import { gitBridge, gitPollingBridge, gitWatcherBridge } from '../gitBridge'
 
 vi.mock('electron', async () => ({ ipcRenderer: (await import('./bridgeHarness')).ipc }))
 
+const WATCH_ID = { watchId: '00000000-0000-4000-8000-000000000001' }
+const SUBSCRIBE = { ...WATCH_ID, filePath: '/p/a.md', profile: 'editor' as const }
+
 describeBridge('fileWatch bridge', fileWatchBridge, {
   invokes: [
-    { method: 'start', args: ['/p/a.md'], channel: 'file-watch:start', wire: ['/p/a.md'] },
-    { method: 'stop', args: ['/p/a.md'], channel: 'file-watch:stop', wire: ['/p/a.md'] },
-    { method: 'stopAll', args: [], channel: 'file-watch:stopAll', wire: [] },
-    { method: 'pause', args: ['/p/a.md'], channel: 'file-watch:pause', wire: ['/p/a.md'] },
-    { method: 'resume', args: ['/p/a.md'], channel: 'file-watch:resume', wire: ['/p/a.md'] },
+    { method: 'subscribe', args: [SUBSCRIBE], channel: 'file-watch:subscribe', wire: [SUBSCRIBE] },
+    { method: 'unsubscribe', args: [WATCH_ID], channel: 'file-watch:unsubscribe', wire: [WATCH_ID] },
+    { method: 'pauseWatch', args: [WATCH_ID], channel: 'file-watch:pauseWatch', wire: [WATCH_ID] },
+    { method: 'resumeWatch', args: [WATCH_ID], channel: 'file-watch:resumeWatch', wire: [WATCH_ID] },
+    { method: 'probe', args: [{ filePath: '/p/a.md' }], channel: 'file-watch:probe', wire: [{ filePath: '/p/a.md' }] },
+    { method: 'readText', args: [{ filePath: '/p/a.md' }], channel: 'file-watch:readText', wire: [{ filePath: '/p/a.md' }] },
+    {
+      method: 'writeText',
+      args: [{ filePath: '/p/a.md', content: 'x' }],
+      channel: 'file-watch:writeText',
+      wire: [{ filePath: '/p/a.md', content: 'x' }]
+    },
     { method: 'getStats', args: [], channel: 'file-watch:stats', wire: [] }
   ],
   events: [
-    { method: 'onFileChanged', channel: 'file-watch:changed' },
-    { method: 'onFileDeleted', channel: 'file-watch:deleted' },
-    { method: 'onFileError', channel: 'file-watch:error' }
+    { method: 'onEvent', channel: 'file-watch:event' },
+    { method: 'onCheck', channel: 'file-watch:check' }
   ]
 })
 

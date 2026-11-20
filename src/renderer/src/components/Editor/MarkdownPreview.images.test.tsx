@@ -15,7 +15,7 @@ import { render, cleanup, act, fireEvent } from '@testing-library/react'
 import { MarkdownPreview, type PreviewRenderedInfo } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
-import { MARKDOWN_IMAGE_SETTLE_MS } from './markdownImageStore'
+import { TIMING_PROFILES } from '../../../../shared/freshness/timingProfiles'
 import type {
   MarkdownImageReadRequest,
   MarkdownImageReadResponse
@@ -174,7 +174,7 @@ describe('MarkdownPreview – project images (#71)', () => {
       // A content edit: not structural, so only the images re-check (#316)
       for (const listener of [...directoryListeners]) listener({ summary: { change: 1 }, structural: false })
     })
-    await advance(MARKDOWN_IMAGE_SETTLE_MS)
+    await advance(TIMING_PROFILES.dependent.settleMs)
 
     const after = container.querySelector('img[alt="icon"]')
     expect(after?.getAttribute('src')).toBe('data:image/svg+xml;base64,SVG2')

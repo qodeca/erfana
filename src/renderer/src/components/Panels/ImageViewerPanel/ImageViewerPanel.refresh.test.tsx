@@ -16,32 +16,37 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 import { ImageViewerPanel } from './ImageViewerPanel'
 import { TEST_IDS } from '../../../constants/testids'
-import { VIEWER_BANNER_COPY } from './imageViewerStatus.logic'
 import { installImageViewerHarness } from './__test__/testUtils'
+import { FRESHNESS_NOTICE_COPY } from '../../FileConflictNotification/freshnessNoticeCopy'
 
 const h = installImageViewerHarness()
+
+/** Past the image profile's read retries (100 + 300 + 900 ms), with headroom. */
+const RETRIES_MS = 4_000
 
 describe('ImageViewerPanel – live refresh', () => {
   describe('Watch lifecycle', () => {
     it('starts a watch on mount and stops it on unmount', async () => {
       const { unmount } = await h.renderAndSettle('/proj/icon.png')
-      expect(h.fileWatch.start).toHaveBeenCalledWith('/proj/icon.png')
+      await waitFor(() => expect(h.fileWatch.subscribe).toHaveBeenCalledTimes(1))
+      const [request] = h.fileWatch.subscribe.mock.calls[0]
+      expect(request).toMatchObject({ filePath: '/proj/icon.png', profile: 'image' })
 
       unmount()
 
-      // Queued behind the start, so it settles a tick later.
-      await waitFor(() => expect(h.fileWatch.stop).toHaveBeenCalledWith('/proj/icon.png'))
-      // One start, one stop: no residual subscriber count main-side.
-      expect(h.fileWatch.stop).toHaveBeenCalledTimes(h.fileWatch.start.mock.calls.length)
+      // One subscribe, one unsubscribe of the same id: nothing left held main-side
+      await waitFor(() => expect(h.fileWatch.unsubscribe).toHaveBeenCalledWith(request.watchId))
+      expect(h.fileWatch.unsubscribe).toHaveBeenCalledTimes(1)
     })
 
-    it('never pauses or resumes the watch', async () => {
+    it('keeps one watch across a refresh', async () => {
       await h.renderAndSettle('/proj/icon.png')
       h.emitChanged('/proj/icon.png')
       await waitFor(() => expect(h.readBytes).toHaveBeenCalledTimes(2))
 
-      expect(h.fileWatch.pause).not.toHaveBeenCalled()
-      expect(h.fileWatch.resume).not.toHaveBeenCalled()
+      // A viewer never saves, so it has nothing to pause; a refresh is not a resubscribe
+      expect(h.fileWatch.subscribe).toHaveBeenCalledTimes(1)
+      expect(h.fileWatch.unsubscribe).not.toHaveBeenCalled()
     })
 
     it('ignores change events for other paths', async () => {
@@ -54,13 +59,12 @@ describe('ImageViewerPanel – live refresh', () => {
   })
 
   describe('Refresh', () => {
-    it('swaps the src and re-reads the file size', async () => {
+    it('swaps the src and shows the new file size (from the read’s stamp, no second request)', async () => {
       await h.renderAndSettle('/proj/icon.png')
       expect(await screen.findByText('2.0 KB')).toBeInTheDocument()
 
       h.readBytes.mockResolvedValue('data:image/png;base64,BBBB')
-      h.getStats.mockResolvedValue({ size: 5120 })
-      h.emitChanged('/proj/icon.png')
+      h.emitChanged('/proj/icon.png', { size: 5120 })
 
       await waitFor(() => {
         expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_IMAGE)).toHaveAttribute(
@@ -109,6 +113,8 @@ describe('ImageViewerPanel – live refresh', () => {
       h.readBytes.mockRejectedValue(new Error('truncated'))
       h.emitChanged('/proj/icon.png')
       await waitFor(() => expect(h.readBytes).toHaveBeenCalledTimes(2))
+      // The read is retried on the profile's back-off before the tab says so (#478 L2)
+      const banner = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER, {}, { timeout: RETRIES_MS })
 
       // The pixels are still the last good ones - the tab is never blanked.
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_IMAGE)).toHaveAttribute(
@@ -117,10 +123,9 @@ describe('ImageViewerPanel – live refresh', () => {
       )
 
       // ...but it is NOT silent. A silent failed refresh reads as "the agent's
-      // edit did nothing" (QG-11a H2).
-      const banner = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
-      expect(banner).toHaveAttribute('data-variant', 'stale')
-      expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.stale)
+      // edit did nothing" (QG-11a H2): the "can't be shown" notice, with Reload.
+      expect(banner).toHaveAttribute('data-notice', 'unavailable')
+      expect(banner).toHaveTextContent(FRESHNESS_NOTICE_COPY.unreadable('icon.png'))
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeInTheDocument()
     })
 
@@ -129,7 +134,7 @@ describe('ImageViewerPanel – live refresh', () => {
 
       h.readBytes.mockRejectedValue(new Error('truncated'))
       h.emitChanged('/proj/icon.png')
-      await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
+      await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER, {}, { timeout: RETRIES_MS })
 
       h.readBytes.mockResolvedValue('data:image/png;base64,BBBB')
       h.emitChanged('/proj/icon.png')
@@ -332,7 +337,7 @@ describe('ImageViewerPanel – live refresh', () => {
       h.emitChanged('/proj/icon.png')
 
       // Hidden: the watch fired, but the multi-MB pull did not.
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
+      await waitFor(() => expect(h.fileWatch.subscribe).toHaveBeenCalled())
       expect(h.readBytes).toHaveBeenCalledTimes(1)
 
       act(() => emitVisibility({ isVisible: true }))

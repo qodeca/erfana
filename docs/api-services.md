@@ -108,66 +108,62 @@ Watches file content for external changes with auto-reload and conflict detectio
 
 ### Public Methods
 
-#### `async watchFile(filePath: string, webContents: WebContents): Promise<void>`
-Start watching file for changes. Watches are refcounted per `webContents`, so the caller must pass the owning window's `WebContents` (the same object is used to push change events back and to clean up via `cleanupForWebContentsId(id)`).
+#### `async subscribe(input: SubscribeInput): Promise<SubscribeReply>`
+Start following a file for one consumer (#478). `input` is `{ owner, watchId, filePath, profile }`: the owner is a window (`{ kind: 'window', webContentsId }`) or an in-process owner, the `watchId` is the consumer's own id, and the profile picks the timing and the watch bucket. One chokidar watch serves every subscription on a file. Answers once the watch is live (after chokidar's `ready`):
 
-`MAX_WATCHED_FILES` (100) governs **new** entries only: joining a path that is already watched never fails on the cap. A refused join would watch nothing while its later `unwatchFile` still decremented the count, closing the watcher for the consumer that owns it (issue #70).
+- `{ status: 'started', stamp, liveRefresh }` – following; `stamp` is the file as it is now, so the caller catches up with a write it missed (G3);
+- `{ status: 'queued' }` – past the bucket cap; it gets a `started` event when a slot frees (G9);
+- `{ status: 'refused', code }` – `PROJECT_CHANGED`, `OUTSIDE_PROJECT`, `NOT_FOUND`, `UNSUPPORTED`, `DUPLICATE_ID`, `PAGE_CHANGED`, or `WATCH_FAILED` (also when the waitlist is full).
 
-**Parameters:**
-- `filePath` - Absolute path to file
-- `webContents` - Electron `WebContents` of the subscribing window
-
-**Side Effects:**
-- Creates chokidar watcher (300ms debounce)
-- Sends `file-watch:changed` with `{ filePath }` over IPC to the subscribing window (no EventEmitter event is emitted)
+The `tabs` bucket cap (100, `WATCH_BUCKETS` in `src/shared/freshness/timingProfiles.ts`) governs **new** watched files only: joining a file that is already watched never fails on the cap.
 
 ---
 
-#### `async unwatchFile(filePath: string, webContents: WebContents): Promise<void>`
-Stop watching file for one subscriber. The underlying chokidar watcher is closed only when the last subscriber unwatches.
-
-**Parameters:**
-- `filePath` - Absolute path to file
-- `webContents` - Electron `WebContents` of the unsubscribing window
+#### `async unsubscribe(owner: WatchOwner, watchId: string): Promise<void>`
+Stop one subscription. The chokidar watch closes when the last subscription on its file goes; a foreign or unknown id is a no-op.
 
 ---
 
-#### `pauseWatch(filePath: string): void`
-Temporarily pause watching (used during save operations). Synchronous.
-
-**Parameters:**
-- `filePath` - Absolute path to file
+#### `pauseSubscription(owner, watchId): void` / `resumeSubscription(owner, watchId): { success, missed }`
+Pause one subscription around the owner's own save, and end that pause. A change during the pause is not sent; `missed` says one came. A pause ends by itself after the profile's `pauseMaxMs`. Other subscriptions on the same file keep hearing changes (L5).
 
 ---
 
-#### `resumeWatch(filePath: string): void`
-Resume watching after pause. Synchronous.
-
-**Parameters:**
-- `filePath` - Absolute path to file
+#### Owners: windows and in-process consumers
+An owner is either a window (`{ kind: 'window', webContentsId }`) or an in-process owner (`{ kind: 'process', ownerId, onEvent, onCheck? }`). The HTML preview's page file and sub-files and the comment watches are in-process owners: they subscribe through the same method, so they draw from the same buckets (`preview` 16 per owner and 64 in all, `comments` 64), are suspended and ended with a project switch, re-armed after a wake and covered by the health round. Events reach an in-process owner through its `onEvent` callback instead of IPC. Never build a chokidar watcher of your own for a file a tab follows.
 
 ---
 
 #### Other public methods
-- `async unwatchAll(webContents: WebContents): Promise<void>` - Drop every watch held by one window
-- `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close to prevent stale watchers
-- `setProjectPath(path: string): void` - Set the project root and bump the session token so stale events from the previous project are dropped
-- `getStats(): { totalWatched: number; fileDetails: Array<{ path: string; watchers: number }> }`
+- `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close or reload: drops every subscription that window owned
+- `async pageNavigated(webContentsId: number): Promise<void>` / `async dropOwner(ownerKey: string): Promise<void>` - A page navigation drops that window's subscriptions and waitlist entries; `dropOwner` does the same for an in-process owner
+- `recheckTarget(realPath: string): Promise<RecheckAnswer>` - The check `armWatch` runs (real path inside the project, a regular file), for a main-side probe or read; `unresolved` for a `realpath` that failed with something other than ENOENT
+- `async suspendAll(): Promise<void>` / `async resumeSuspended(): Promise<void>` / `async endSuspended(generation, reason?): Promise<void>` - The project-switch trio: suspend before the commit, resume if the open fails, end every old subscription with `ended` after the commit
+- `async rearmAll(): Promise<void>` - Re-arm every watch (power resume)
+- `runHealthRound(): Promise<void>` / `checkInProcessOwners(): void` - A health round now; ask every in-process owner to check its files (both run after a wake)
+- `setBucketCap(bucket, totalCap): number` - Test hook: change a bucket cap, answers the old one
+- `getStats()` - `{ totalWatched, subscriptions, paused, waiting, buckets, fileDetails }`
 - `async stopAll(): Promise<void>` / `async dispose(): Promise<void>` - Shutdown paths
+
+#### Probe, read and write
+The service does not read or write file content. `file-watch:probe`, `file-watch:readText` and `file-watch:writeText` are answered by helpers in `src/main/services/freshness/`, behind the same confinement as `subscribe`: `probeFile` (is the file still the version named: `same`, `changed`, `missing`, `unreadable`, `unsupported`), `readText` (classified: `ok` with text, stamp and line ending, or `too-large`, `binary`, `unsupported-encoding`, `unsupported`, `missing`, `unreadable`, `busy`; a path the confinement refuses as outside the project answers `outside-project`) and `writeTextChecked` (an atomic write that, given `expectedStamp`, lands only while the file is still that version; answers `written` with the new stamp or `changed-on-disk`). A main-side owner reaches the first two through `createMainFreshnessSource`, which re-checks the path before opening it.
 
 ---
 
 ### Renderer notifications
 
 `FileWatcherService` is not an `EventEmitter` — it sends straight to the
-subscribing windows over IPC (`watcher/watchNotifier.ts`, which skips destroyed
-windows and swallows send failures). Two of the three contracts changed in #70.
+owning window over IPC (`watcher/watchNotifier.ts`, which skips destroyed
+windows and swallows send failures), one `file-watch:event` per subscription,
+naming its `watchId` (#478).
 
-| Channel | Payload | When |
-|---|---|---|
-| `file-watch:changed` | `{ filePath }` | Content changed externally, after `awaitWriteFinish` (300 ms) + a 300 ms debounce. **Since #70 this also covers an atomic replace** (write temp + rename): where the platform reports that as an `unlink`, the service re-arms the watch and re-enters the same debounced change path, so the renderer sees a change rather than a delete followed by silence |
-| `file-watch:deleted` | `{ filePath }` | The file is **genuinely** gone — confirmed by one final `stat` after the 100 ms atomic-save window closes. An unreadable file counts as there, except on Windows: a file that answers EPERM or EBUSY again 250 ms after a first EPERM or EBUSY counts as gone, because it is being deleted while another process holds it open (#252) |
-| `file-watch:error` | `{ filePath, error, ended? }` | A chokidar error, **and since #70 any watch teardown that is not a genuine delete** (then `ended: true`, so the renderer forgets its hold – #252): the session token was bumped mid-window, the path stopped resolving inside the project, or the replacement watcher could not be created. Sent by `notifyWatchDead`, which deliberately bypasses the session-version guard that `notifyWebContents` applies — a "your watch is dead" message that the guard dropped would leave the renderer showing stale content with no indicator, which is the symptom #70 exists to remove |
+| Kind | When |
+|---|---|
+| `changed` | Content changed externally, once the write has finished (the profile's write-finish wait). **This also covers an atomic replace** (write temp + rename): where the platform reports that as an `unlink`, the service re-arms the watch and reports a change rather than a delete followed by silence (#70) |
+| `deleted` | The file is **genuinely** gone — confirmed by one final `stat` after the 100 ms atomic-save window closes. An unreadable file counts as there, except on Windows: a file that answers EPERM or EBUSY again 250 ms after a first EPERM or EBUSY counts as gone, because it is being deleted while another process holds it open (#252) |
+| `started` | A queued subscription got a slot, with the file's stamp |
+| `restarted` | The watch was re-armed (power resume); the tracker checks the file |
+| `ended` | The watch is gone and will not come back by itself, with a reason: `project-switch`, `project-closed`, `outside-project`, `unsupported` or `watcher-error`. Never dropped silently — a dead watch the renderer did not hear of would leave stale content with no indicator, which is the symptom #70 exists to remove |
 
 Neither `changed` nor `deleted` is emitted during a pause window. Full mechanics
 in [File Watching § Single-file watch internals](./file-watching/README.md#single-file-watch-internals-70).
@@ -302,7 +298,7 @@ File operations with validation and error handling.
 ### Public Methods
 
 #### `readFile(filePath: string): Promise<string>` / `writeFile(filePath: string, content: string): Promise<void>`
-Read or write file contents (UTF-8). Throws on FS error. `writeFile` is crash-safe (`atomicWriteText`, `src/main/utils/atomicWrite.ts`): it writes a temp file next to the target and renames it over only when complete, so a crash cannot leave a half-written file; read-only files, symbolic links and shared hard links keep their old behaviour. Recreating a missing folder is not `FileService`'s job: the `file:writeFile` handler calls `restoreParentDirectory` (`src/main/services/file/`) first when the request carries `createParentDirs: true`, which the editor sets only for the manual "Save to restore it" of a tab whose folder was renamed or deleted (see [File watching § Use Cases](./file-watching/README.md#use-cases)).
+Read or write file contents (UTF-8). Throws on FS error. `writeFile` is crash-safe (`atomicWriteText`, `src/main/utils/atomicWrite.ts`): it writes a temp file next to the target and renames it over only when complete, so a crash cannot leave a half-written file; read-only files, symbolic links and shared hard links keep their old behaviour. Recreating a missing folder is not `FileService`'s job: the `file:writeFile` handler calls `restoreParentDirectory` (`src/main/services/file/`) first when the request carries `createParentDirs: true`, which a caller sets only for the manual restore of a deleted tab whose folder was renamed or deleted (the editor now writes through `file-watch:writeText`, which does the same – #478) (see [File watching § Use Cases](./file-watching/README.md#use-cases)).
 
 #### `readDirectory(dirPath: string, options?: { shallow?: boolean }): Promise<FileNode[]>`
 The project tree walk. Folders the watcher ignores (`dist`, `build`, `.venv`, `coverage`, …) come back as rows with `lazy: 'ignored'` and no children; folders a walk bound left unread – the entry cap (`MAX_WALK_ENTRIES`, 50,000), a shallow read, or the cap on folder links entered – come back `lazy: 'capped'`; a folder link whose real folder the walk already entered by another path is `lazy: 'linked'` (its files are in the tree under that path). Links that lead outside the project or loop back are not followed. The rest is read several folders at a time. `shallow: true` reads one level and leaves every sub-folder lazy – that is how the renderer expands a lazy folder (`useLazyFolderChildren`). Single-flight per path (#208). Measurement: [lazy tree walk](./performance/2026-10-22-lazy-tree-walk.md).

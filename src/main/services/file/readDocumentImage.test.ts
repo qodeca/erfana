@@ -29,6 +29,7 @@ vi.mock('fs/promises', () => ({
         isFile: () => file.isFile,
         size: BigInt(file.statSize),
         mtimeNs: 1n,
+        ctimeNs: 5n,
         ino: 2n
       }),
       read: async (buffer: Buffer, offset: number, length: number, position: number) => {
@@ -56,14 +57,21 @@ describe('readDocumentImage', () => {
     await expect(readDocumentImage('/p/a.png', undefined, 10)).resolves.toEqual({
       status: 'ok',
       dataUrl: `data:image/png;base64,${Buffer.from('abc').toString('base64')}`,
-      version: '3:1:2'
+      // size:mtimeNs:ctimeNs:ino (#478 L4 added the change time)
+      version: '3:1:5:2',
+      // The stamp of the same fstat: what the preview's image tracker compares (#478 S18)
+      stamp: expect.objectContaining({ size: 3, ino: '2' })
     })
     expect(state.closed).toBe(1)
   })
 
   it('answers unchanged for the version the caller holds, without reading', async () => {
     state.file = { isFile: true, statSize: 3, content: Buffer.from('abc') }
-    await expect(readDocumentImage('/p/a.png', '3:1:2', 10)).resolves.toEqual({ status: 'unchanged', version: '3:1:2' })
+    await expect(readDocumentImage('/p/a.png', '3:1:5:2', 10)).resolves.toEqual({
+      status: 'unchanged',
+      version: '3:1:5:2',
+      stamp: expect.objectContaining({ size: 3, ino: '2' })
+    })
   })
 
   it('refuses anything that is not a regular file, and closes the handle', async () => {

@@ -202,6 +202,19 @@ export class MonacoPage {
     return text.replace(/\u00a0/g, ' ')
   }
 
+  /**
+   * Where this editor is scrolled (`scrollTop`, px) and the line its cursor is
+   * on, read through the e2e test hook (`__erfanaTest.editorView`), so a test
+   * can prove an outside reload left the view where the user had it (#478 P2).
+   *
+   * @throws when no live editor with a cursor is in the container
+   */
+  async viewState(): Promise<{ scrollTop: number; cursorLine: number }> {
+    const view = await this.getEditor().evaluate((el) => window.__erfanaTest?.editorView(el) ?? null)
+    if (view === null) throw new Error('MonacoPage.viewState: no live Monaco editor with a cursor (or the e2e test hooks are off)')
+    return view
+  }
+
   async waitForCursor(): Promise<void> {
     // Attached in a focused editor, not visible: the cursor blinks, so its visibility
     // flips by design.

@@ -94,7 +94,8 @@ describe('markdown-image:read', () => {
     const result = (await call({ filePath: join(tmp, 'assets', 'pixel.png') })) as any
     expect(result.status).toBe('ok')
     expect(result.dataUrl).toBe('data:image/png;base64,iVBORw==')
-    expect(result.version).toMatch(/^\d+:\d+:\d+$/)
+    // size:mtimeNs:ctimeNs:ino (#478 L4 added the change time)
+    expect(result.version).toMatch(/^\d+:\d+:\d+:\d+$/)
   })
 
   it('returns an SVG as an image/svg+xml data URL for an <img>, never as markup', async () => {
@@ -111,7 +112,8 @@ describe('markdown-image:read', () => {
     const first = (await call({ filePath })) as any
     await expect(call({ filePath, knownVersion: first.version })).resolves.toEqual({
       status: 'unchanged',
-      version: first.version
+      version: first.version,
+      stamp: first.stamp
     })
   })
 
