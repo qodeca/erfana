@@ -47,6 +47,16 @@ describe('isBrowserFolderTrackedByGit (ADR 0009 decision 3)', () => {
     expect(await isBrowserFolderTrackedByGit('/p', runner({ error: Object.assign(new Error('fatal'), { code: 128 }) }))).toBe(false)
   })
 
+  it.each([1, 69])('is not tracked when git exits %i with no listing (the macOS stand-in git without Command Line Tools)', async (code) => {
+    const error = Object.assign(new Error('xcrun: error: invalid active developer path'), { code, signal: null })
+    expect(await isBrowserFolderTrackedByGit('/p', runner({ error }))).toBe(false)
+  })
+
+  it('fails closed on an output overflow', async () => {
+    const error = Object.assign(new Error('stdout maxBuffer length exceeded'), { code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
+    expect(await isBrowserFolderTrackedByGit('/p', runner({ error }))).toBe(true)
+  })
+
   it('fails closed on any other failure, logging no command line', async () => {
     const error = Object.assign(new Error('Command failed: git -C /Users/alice/secret ls-files'), {
       code: null,

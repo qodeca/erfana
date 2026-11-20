@@ -52,6 +52,7 @@ import { BrowserProfileService, storageBackendFor } from './BrowserProfileServic
 import { BrowserProjectTeardown } from './browserProjectTeardown'
 import { isBrowserFolderTrackedByGit } from './browserProfileGit'
 import { markIgnoredBySync } from './browserSyncIgnore'
+import { markDownloadQuarantined } from './downloads/downloadQuarantine'
 import type { PurposeSigner } from './browserProfileMarker'
 import { hardenBrowserSession } from './browserSessionPolicy'
 import { adoptedBrowserViewOptions, buildBrowserWebPreferences } from './browserWebPreferences'
@@ -426,7 +427,8 @@ function createBrowserSite(): BrowserSite {
             : await dialog.showSaveDialog(options)
         return result.canceled ? null : (result.filePath ?? null)
       },
-      showItemInFolder: (path) => shell.showItemInFolder(path)
+      showItemInFolder: (path) => shell.showItemInFolder(path),
+      markQuarantined: (path) => markDownloadQuarantined(path)
     }
   })
 }
