@@ -3,7 +3,9 @@
 /**
  * The real-file corpus of the comment round trip (spec 024 024-NFR-003,
  * 024-AC-026): which files, from where, under which licence – built at run
- * time from files already on disk, never committed and never fetched.
+ * time from files on disk, never committed. The only download is
+ * `scripts/fetch-corpus.mjs` (`npm run corpus:fetch`): pinned, SHA-256-checked
+ * archives into the git-ignored `temp/corpus/sources/`.
  *
  * Sources, in order:
  * - `repo` – the repository's own tracked `.md`/`.markdown`/`.html`/`.htm`
@@ -12,9 +14,11 @@
  * - `node_modules` – every such file in the installed packages, each under
  *   the licence its owning package's `package.json` declares; only
  *   permissive licences are kept ({@link isPermissive});
- * - extra roots named in `CORPUS_EXTRA_ROOTS` – a JSON array of
+ * - extra roots: the ones `CORPUS_EXTRA_ROOTS` names – a JSON array of
  *   `{ "label", "dir", "licence" }`, for installed documentation such as
- *   Python's HTML docs; kept only when the licence is permissive.
+ *   Python's HTML docs – or, when it is unset, the pinned sources
+ *   `scripts/fetch-corpus.mjs` fetched (`temp/corpus/sources/roots.json`);
+ *   kept only when the licence is permissive.
  *
  * A file whose bytes another file already has is dropped, so a package
  * installed twice counts once. The manifest is what is recorded: source,
@@ -48,7 +52,12 @@ export interface ExtraRoot {
   readonly label: string
   readonly dir: string
   readonly licence: string
+  /** The pinned archive it came from, for a fetched source; absent for a `CORPUS_EXTRA_ROOTS` one. */
+  readonly url?: string
 }
+
+/** Where `scripts/fetch-corpus.mjs` lists the pinned sources it fetched, from the repository root. */
+export const FETCHED_ROOTS = join('temp', 'corpus', 'sources', 'roots.json')
 
 const MARKDOWN_EXT = /\.(?:md|markdown)$/i
 const HTML_EXT = /\.html?$/i
@@ -218,6 +227,22 @@ export function extraRootsFromEnv(value = process.env.CORPUS_EXTRA_ROOTS): Extra
     }
     if (!existsSync(dir)) throw new Error(`CORPUS_EXTRA_ROOTS: ${label}: ${dir} does not exist`)
     return { label, dir, licence }
+  })
+}
+
+/**
+ * The extra roots of this run: `CORPUS_EXTRA_ROOTS` when set, else the
+ * pinned sources `scripts/fetch-corpus.mjs` fetched, else none.
+ */
+export function extraRoots(repoRoot: string, value = process.env.CORPUS_EXTRA_ROOTS): ExtraRoot[] {
+  if (value !== undefined && value.trim() !== '') return extraRootsFromEnv(value)
+  const file = join(repoRoot, FETCHED_ROOTS)
+  if (!existsSync(file)) return []
+  const fetched = JSON.parse(readFileSync(file, 'utf8')) as Array<{ label: string; dir: string; licence: string; url: string }>
+  return fetched.map(({ label, dir, licence, url }) => {
+    const absolute = join(repoRoot, dir)
+    if (!existsSync(absolute)) throw new Error(`${FETCHED_ROOTS}: ${label}: ${dir} is missing – run \`npm run corpus:fetch -- --force\``)
+    return { label, dir: absolute, licence, url }
   })
 }
 

@@ -11,12 +11,13 @@ Erfana runs GitHub Actions workflows on pushes (and, for the required checks, on
 | E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` or `main`, plus all PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
 | E2E (Linux, xvfb) | `.github/workflows/e2e-linux.yml` | active (advisory, never required) | PR to `develop` or `main` (skipped when a PR changes only `docs/**` or `*.md`), plus `workflow_dispatch` | `ubuntu-latest` | over 30 min on a runner since spec 025 added the browser tests (a 2026-11-04 run on PR #458 was cancelled at its old 30-minute limit); `timeout-minutes: 60`, raised from 30 by owner decision on 2026-11-04 | Runs the Playwright `electron` project headless under xvfb in the Docker image from `e2e/docker/Dockerfile` via `scripts/e2e-linux.sh`; uploads `.local/e2e-linux/` (7 days). Retries 2 (`CI=1`). Tests that need OS keyboard focus run one at a time under the e2e focus lock, the rest two at a time ([OS keyboard focus](./testing/e2e-testing.md#os-keyboard-focus-the-focus-lock)). See [Headless on Linux in Docker](./testing/e2e-testing.md#headless-on-linux-in-docker) |
 | Browser Isolation | `.github/workflows/browser-isolation.yml` | active (**advisory until the owner makes it required** – Q9) | push (except `gh-readonly-queue/**`; all tags) + PR + `merge_group`, plus `workflow_dispatch`; **no paths filter** | `ubuntu-latest` | under 10 min target (not yet measured on a runner; the same suite took 8 s of test time in Docker on an Apple Silicon Mac, plus image build and `npm ci`) | The built-in browser's hostile-page suite – the `browser-isolation` Playwright project – headless under xvfb via `scripts/e2e-linux.sh`; uploads `.local/e2e-linux/` (7 days). See [Browser isolation](#browser-isolation-browser-isolationyml) |
+| Advisory Checks | `.github/workflows/advisory-checks.yml` | active (advisory, never required) | push (except `gh-readonly-queue/**`) + PR, plus `workflow_dispatch` | `ubuntu-latest` | ~2 min (estimate, not yet measured) | `Docs lint` runs `npm run lint:docs` (Vale, markdownlint, lychee; Vale and lychee pinned in `scripts/tools.mjs`). `Spec 025 trace` reports the open acceptance IDs of `npm run check:trace:025` in the run summary and never fails on them: the trace is a release gate. See [Advisory checks](#advisory-checks-advisory-checksyml) |
 | Release | `.github/workflows/release.yml` | active | tag push `v[0-9]+.[0-9]+.[0-9]+`, or `workflow_dispatch` (input `dry-run`, default `true` – skips draft creation and asset uploads) | matrix (mac/win) | ~15–25 min compute + **unbounded approval wait** | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
 | Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `ubuntu-latest` (`validate-inputs`, `publish-release`) + `macos-14` (`build-macos`) + `windows-latest` (`build-windows`) | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
 | Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule (`0 9 1 * *`), plus `workflow_dispatch` | `macos-14` + `windows-latest` + `ubuntu-latest` (`notify-on-failure`) | ~3 min | Credential-health check (Apple notarization, Windows signing) |
 | Windows Native Smoke | `.github/workflows/windows-native-smoke.yml` | active (advisory, never required) | `workflow_dispatch` only (inputs `ref`, `skip_rebuild`) | `windows-latest` | ~10–15 min (estimate, not yet measured) | Proves `electron-builder install-app-deps` rebuilds node-pty for Electron's ABI on Windows and that it spawns a pty under Electron – see [Windows native smoke](#windows-native-smoke-windows-native-smokeyml) |
 
-Two of the eleven files in [`.github/workflows/`](../.github/workflows/) have no row above: `build_mac.yml` and `build_win.yml` are `workflow_call` reusables with no standalone trigger of their own — they run only as jobs of the Release workflow, so they are documented there rather than as separate entries.
+Two of the twelve files in [`.github/workflows/`](../.github/workflows/) have no row above: `build_mac.yml` and `build_win.yml` are `workflow_call` reusables with no standalone trigger of their own — they run only as jobs of the Release workflow, so they are documented there rather than as separate entries.
 
 The Release row's wall-clock needs a caveat: both build legs sit behind the `production-signing` environment approval, which is a required human review with no time limit. Compute time is 15–25 minutes; end-to-end is that plus however long the approval takes. See [release.md § Approval gate](./build/release.md#approval-gate-production-signing).
 
@@ -167,6 +168,14 @@ Job `Browser isolation`, workflow display name `Browser Isolation`. Runs the bui
 - **Status: advisory.** The owner decided (Q9, 2026-11-03) that `Browser isolation` becomes a **required check after the spec 025 merge**; branch protection is set in GitHub, not here. Until it is, the job is not in the required set above, and the required-check lists in `CLAUDE.md` and this page change only when the owner sets it.
 - **Local run:** `npm run test:e2e:browser-isolation` (macOS or Windows, builds in e2e mode first) or `npm run test:e2e:linux -- --project=browser-isolation` (the CI path, in Docker). Docker replaces a `node_modules` **symlink** in the checkout with a directory of Linux builds (seen 2026-11-03 in a worktree whose `node_modules` linked to the main checkout's); run the Docker path only in a checkout with a real `node_modules` folder or none.
 
+## Advisory checks (`advisory-checks.yml`)
+
+Workflow display name `Advisory Checks`, two jobs, neither required by branch protection.
+
+- **`Docs lint`** – `npm run lint:docs` over the user guide: Vale prose rules (`.vale.ini`, the committed `Erfana` style), markdownlint (`.markdownlint-cli2.*`, an npm devDependency) and lychee links (`lychee.toml`, with `GITHUB_TOKEN` to lift the GitHub rate limit). Vale and lychee come from [`scripts/tools.mjs`](../scripts/tools.mjs): version-pinned, SHA-256-checked downloads into `.local/bin/`, the same binaries a local run uses. lychee reaches the network, so a site that is down can fail the job; that is one reason it stays advisory.
+- **`Spec 025 trace`** – runs `scripts/check-spec025-trace.mjs` and writes its tail to the run summary. The trace is a release gate (spec 025 `04-acceptance.md`): acceptance IDs whose lane is manual, packaged, bench or review stay open until their evidence row exists, so the job reports the count as a notice and never fails.
+- **Trust boundary.** Top-level `permissions: {}`; each job holds `contents: read` only and checks out with `persist-credentials: false`. Concurrency group `advisory-checks-<ref>`, cancel in progress.
+
 ## Windows native smoke (`windows-native-smoke.yml`)
 
 A manual, advisory proof ([#178](https://github.com/qodeca/erfana/issues/178)) that native modules rebuild and load under Electron on Windows. It exercises the one path no other Windows job runs – the package `postinstall`'s `electron-builder install-app-deps`, which drives `@electron/rebuild` and node-gyp over node-pty. `Windows checks` runs `npm rebuild node-pty` (node-pty's own node-gyp) instead, and packaging skips the rebuild because `electron-builder.yml` sets `npmRebuild: false`. Run it whenever the rebuild toolchain changes (`electron-builder`, `@electron/rebuild`, `node-gyp`, node-pty, Electron).
@@ -242,7 +251,7 @@ For historical reference, when the workflow was active it ran on `push` to `deve
 
 ## Local reproduction
 
-Six of the seven required checks have a local equivalent (`Secret scan` runs gitleaks and trufflehog in CI only). Run them before pushing to save CI minutes:
+All seven required checks have a local equivalent; for `Secret scan`, `npm run check:secrets` runs the pinned gitleaks over every ref (trufflehog runs in CI only, or with `node scripts/tools.mjs run trufflehog git file://$PWD --results=verified`). `npm run doctor` first shows whether this machine can run them. Run them before pushing to save CI minutes:
 
 ```bash
 npm run lint              # Lint, step 1 – ESLint (with --fix), lint:shebang, lint:tracked-dirs, lint:max-lines
@@ -253,6 +262,8 @@ npm run typecheck         # Typecheck – node, web, then the node / web / e2e t
 npm run test:cov          # Unit tests + Coverage – every unit test once, plus the coverage floors
 npx electron-vite build   # Build – also runs the preload self-containment check
 npm run check:headers     # License compliance, first half (reuse lint needs pipx)
+npm run check:secrets     # Secret scan – gitleaks half, pinned binary from scripts/tools.mjs
+npm run lint:docs         # advisory Docs lint – Vale, markdownlint, lychee
 npm run test:e2e          # electron project – local-only today (e2e.yml is disabled)
 npm run test:e2e:visual   # visual project – local-only today (visual hang on macos-latest)
 npm run test:e2e:browser-isolation  # hostile-page suite – what the advisory Browser isolation job runs

@@ -304,6 +304,9 @@ test.describe('025-AC-070 the send notice and the terminal reveal', () => {
     browserServers,
     testProject
   }) => {
+    // Three sends, each stepping the clock 20 ms at a time: 45–48 s alone in the macOS VM,
+    // past the 60 s default in every full VM run (2026-11-10); the notice was on screen.
+    test.setTimeout(120_000)
     const window = windowWithTestProject
     const send = await BrowserSendUi.open(appWithTestProject, window, testProject.path)
     const agent = await send.startStubAgent(test.info().outputPath('agent-input.bin'))

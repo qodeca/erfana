@@ -93,9 +93,15 @@ test.describe('built-in browser isolation', () => {
     await page.waitForLoaded(url)
     const windows = await browserHook<number>(browserTabs.app, 'windowCount')
 
+    // The page's own probes add rows above the button as they settle (the worker one is
+    // async), so wait for them first: a click aimed before the last row lands misses it.
+    await page.canary()
     // A user click may open a popup (025-FR-011); the page probes it and closes it again.
     await page.clickSelector('#open-probe-popup')
-    await page.waitFor(`window.__canary.results.some(r => r.name === 'popup electron')`, 'popup probed')
+    // `popup` alone is the page's note that window.open returned null: wait for either, so a
+    // refused popup fails on the assertion below with its own row, not on a timeout.
+    await page.waitFor(`window.__canary.results.some(r => r.name === 'popup electron' || r.name === 'popup')`, 'popup probed')
+    expect((await page.canary()).attempts.filter((a) => a.name === 'popup')).toEqual([])
     const canary = await page.canary()
     expect(canary.attempts.filter((a) => a.outcome === 'leaked')).toEqual([])
     const popupProbes = canary.attempts.filter((a) => a.name.startsWith('popup '))

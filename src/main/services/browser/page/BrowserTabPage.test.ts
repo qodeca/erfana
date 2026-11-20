@@ -54,6 +54,18 @@ describe('BrowserTabPage load errors', () => {
     expect(page.facts().loadError).toBeNull()
   })
 
+  it('025-AC-021 a certificate failure reported after the certificate page was answered is still not a load error', () => {
+    const { tab, page, startMain, failMain } = setup()
+    // Windows: Proceed anyway (or Back to safety) closed the page, and the reload started, before Chromium reported the failure.
+    tab.erfanaPage = null
+    startMain()
+    failMain(-202, 'https://selfsigned.test/')
+    expect(page.facts()).toMatchObject({ failedUrl: null, loadError: null })
+    // A failure of another kind still shows the load-error page.
+    failMain(-105, 'https://selfsigned.test/')
+    expect(page.facts().loadError).toMatchObject({ code: -105 })
+  })
+
   it('ignores a cancelled load, a frame failure and an empty address', () => {
     const { tab, page, failMain } = setup()
     failMain(-3)

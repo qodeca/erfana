@@ -36,7 +36,7 @@ The integrated terminal runs your shell and any CLI agent you start. Erfana host
 
 ## Web links
 
-**What they do:** A plain click on an `http` or `https` link in the terminal opens it in a new [browser tab](built-in-browser.md) in the editor area. <kbd>⌘</kbd>-click / <kbd>Ctrl</kbd>-click opens it in your operating system's default browser instead. Any other kind of link goes to your operating system, after Erfana checks it. **How to reach them:** select a web address printed in the terminal.
+**What they do:** Selecting an `http` or `https` link in the terminal opens it in a new [browser tab](built-in-browser.md) in the editor area. <kbd>⌘</kbd>-click / <kbd>Ctrl</kbd>-click opens it in your operating system's default browser instead. Any other kind of link goes to your operating system, after Erfana checks it. **How to reach them:** select a web address printed in the terminal.
 
 ## Copy and paste
 

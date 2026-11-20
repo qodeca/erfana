@@ -21,6 +21,17 @@ import { defineConfig } from 'vitest/config'
 import type { TestProjectInlineConfiguration } from 'vitest/config'
 
 const SHARDS = Number(process.env.CORPUS_SHARDS ?? '8')
+
+// The timing run measures the parse code the app ships. Outside production, Vite
+// resolves the `development` package condition, and Vitest passes it to its workers
+// as `--conditions development`: the micromark packages then load their debug builds,
+// with assertions, which the app's bundle never loads. Vitest takes production from
+// NODE_ENV only (not from `mode`; Vitest has set it to `test` by the time this file
+// loads), so the timing run sets it here, where it works on every OS. The corpus round trip keeps the debug builds: their assertions are worth
+// having in a correctness run.
+if (process.argv.some((arg) => arg === 'timing' || arg === '--project=timing') && (process.env.NODE_ENV ?? 'test') === 'test') {
+  process.env.NODE_ENV = 'production'
+}
 const CORPUS_TEST = 'src/main/services/comments/corpus/corpusRoundTrip.test.ts'
 const TIMING_TEST = 'src/main/services/comments/corpus/largeFileTiming.test.ts'
 /** Long enough for a shard of the whole corpus on a slow machine. */

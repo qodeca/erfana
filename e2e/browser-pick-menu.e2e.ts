@@ -21,6 +21,7 @@ import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
 import { AgentTerminal, IS_MAC, near, PickFlow, PICK_WAIT_MS as WAIT_MS } from './pages/browser-pick-flow.page'
 import type { Box } from './pages/browser-pick.page'
+import { ECHO_AGENT } from './fixtures/browser/echoAgent'
 
 const MENU_BANNER = 'Picking – Esc or click outside closes the panel'
 const PICK_FIRST = 'Picking – click an element'
@@ -325,7 +326,7 @@ test.describe('025-AC-030 the prompt-actions menu', () => {
     await flow.load(browserServers.sites.static.url('/elements.html'))
     await flow.pickButton.click()
     await flow.pickByClick('#save-label', 'span#save-label ')
-    await expect(flow.panelTarget).toHaveAttribute('aria-label', 'Terminal · cat, target terminal')
+    await expect(flow.panelTarget).toHaveAttribute('aria-label', `Terminal · ${ECHO_AGENT.name}, target terminal`)
     await expect(flow.actions.locator('.erf-brw-banner')).toHaveCount(0)
     await expect(flow.action('Explain')).toBeFocused()
     for (const next of [flow.action('Ask'), flow.action('Change'), flow.action('Prompt'), flow.panelTarget, flow.action('Explain')]) {
@@ -434,10 +435,10 @@ test.describe('025-AC-030 the prompt-actions menu', () => {
     const menu = flow.panel.menu('Target terminal')
     await expect(menu).toBeVisible()
     expect((await flow.state()).capture?.id, 'opening the target menu keeps the pick').toBe(captureId)
-    await menu.getByRole('menuitem', { name: /^Terminal · cat/ }).click()
+    await menu.getByRole('menuitem', { name: new RegExp(`^Terminal · ${ECHO_AGENT.name}`) }).click()
     await expect(menu).toHaveCount(0)
     await expect(flow.actions).toBeVisible()
-    await expect(flow.panelTarget).toHaveAttribute('aria-label', 'Terminal · cat, target terminal')
+    await expect(flow.panelTarget).toHaveAttribute('aria-label', `Terminal · ${ECHO_AGENT.name}, target terminal`)
     await expect(flow.chip).toHaveText(/^span#save-label · /)
     expect((await flow.state()).capture?.id).toBe(captureId)
   })

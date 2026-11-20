@@ -18,12 +18,12 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 ## Prerequisites
 
 - **Node.js 24+** (Electron 44 bundles Node.js 24.22.0; the build toolchain needs 24+). The major is pinned in
-  [`.nvmrc`](.nvmrc), so `nvm use` in the repo root selects it, and CI pins the same major (hard-coded in
-  `.github/actions/setup-node-with-retry/action.yml`, not read from `.nvmrc`), and the release build legs
+  [`.nvmrc`](.nvmrc), so `nvm use` in the repo root selects it, and CI reads the same file
+  (`.github/actions/setup-node-with-retry/action.yml`, `node-version-file`), and the release build legs
   (`build_mac.yml`, `build_win.yml`) pin the exact patch, 24.22.1 – a local check and a CI check are
   then running the same Node major. Worth confirming with `node --version` before you trust a green local
   run: a `node` earlier on your `PATH` than your version manager will silently win.
-- **Python 3.12 (known good) or 3.14.x** – **not 3.13** (`node-pty` fails to build on 3.13).
+- **Python 3.12 (known good, pinned in [`.python-version`](.python-version) for pyenv, uv and mise) or 3.14.x** – **not 3.13** (`node-pty` fails to build on 3.13).
 - **Git**.
 - **On Windows:** VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. See [`docs/build/windows.md`](docs/build/windows.md).
 
@@ -35,8 +35,12 @@ cd erfana
 git checkout develop          # the integration branch – branch off this, not main
 git checkout -b feature/my-change
 npm ci                        # NOT `npm install` – see below
+npm run doctor                # check this machine: Node, Python, C++ toolchain, Docker, pinned tools
 npm run dev                   # start the development app
 ```
+
+`npm run doctor` prints one row per prerequisite – ok, warn or FAIL – with the install line for your OS. A FAIL
+blocks `npm ci` or a required check; a warn affects only an optional suite. Exit code 1 when any row fails.
 
 **Use `npm ci`.** It installs exactly what `package-lock.json` records, which is what every CI job does. If you
 need to change dependencies, run `npm install` deliberately, then check `git diff package-lock.json` and keep only
@@ -57,6 +61,29 @@ npm run build:win   # package for Windows
 ```
 
 Packaging details, signing and the Windows toolchain are in [docs/build/](docs/build/README.md).
+
+## Tools by script
+
+Most scripts need only `npm ci`. The rest need something more, listed here. Tools that are not npm packages
+(Vale, lychee, gitleaks, trufflehog) are pinned in [`scripts/tools.mjs`](scripts/tools.mjs): the script that
+needs one downloads it on first use into the git-ignored `.local/bin/`, after checking its SHA-256, so every
+machine and CI run the same build. `npm run tools` downloads all of them at once.
+
+| Script | Needs beyond `npm ci` | Where it runs |
+|---|---|---|
+| `lint:docs:prose` | Vale (pinned, downloaded on first use) | macOS, Linux, Windows; CI `Docs lint` (advisory) |
+| `lint:docs:links` | lychee (pinned, downloaded on first use), network | macOS, Linux, Windows; CI `Docs lint` (advisory) |
+| `check:secrets` | gitleaks (pinned, downloaded on first use) | macOS, Linux, Windows; CI `Secret scan` also runs trufflehog |
+| `check:links`, `check:headers`, `check:version-drift`, `check:trace:025` | git | everywhere |
+| `test:e2e`, `test:e2e:browser-isolation` | a desktop session (the app opens windows) | macOS, Windows |
+| `test:e2e:visual` | a desktop session; baselines are macOS-only | macOS |
+| `test:e2e:linux` | bash and Docker (Docker Desktop, Colima or OrbStack) sharing the checkout into its VM | macOS, Linux; Windows from WSL or Git Bash |
+| `test:e2e:macos-vm` | Tart and a macOS VM (created on first run, about 33 GB); no desktop session, so it runs while the screen is locked | macOS on Apple Silicon |
+| `test:corpus` | network once, for `npm run corpus:fetch` (pinned HTML doc sets) | everywhere |
+| `build:mac*` | macOS, Xcode; signing variables for a signed build | macOS |
+| `build:win` | Windows, VS Build Tools; Azure Trusted Signing for a signed build | Windows |
+| `docs:screenshots` | macOS, the Claude CLI, AppleScript | macOS |
+| transcription e2e | `OPENAI_API_KEY` and `ERFANA_E2E_TRANSCRIPTION=1` (see `.env.example`) | opt-in |
 
 `main` is the stable release branch. Most work goes through `develop`, the day-to-day integration branch: cut your `feature/...` branch from `develop` and open your PR against `develop`.
 
@@ -111,6 +138,7 @@ For changes touching Electron-specific paths, also run the end-to-end suite loca
 ```bash
 npm run test:e2e        # the Playwright Electron suite on your machine
 npm run test:e2e:linux  # the same suite headless in Docker under xvfb, as CI runs it
+npm run test:e2e:macos-vm  # the macOS suite in a Tart VM: no one needs to keep the screen unlocked
 ```
 
 The macOS e2e workflow is disabled. The only e2e run on CI is the advisory `E2E (Linux, xvfb)` job

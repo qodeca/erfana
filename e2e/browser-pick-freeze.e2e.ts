@@ -194,8 +194,8 @@ test.describe('025-AC-028 hover-only element and the freeze', () => {
 // Titled without the ID: "two browser tabs send at the same time" cannot be walked in the UI – the editor area never
 // splits (dockview drag is off by design) and hiding a tab discards its capture (025-FR-052), so one window never has
 // two captures held at once. The property is proven in main: BrowserPicks.test.ts writes two tabs' captures at once.
-test.describe('the capture is taken at the pick (025-AC-067)', () => {
-  test('picked by click in state 2, then advanced and removed under the Change dialog: the screenshot and HTML show state 2 and the console has only entries from before the pick', async ({
+test.describe('the capture is taken at the pick', () => {
+  test('025-AC-067 picked by click in state 2, then advanced and removed under the Change dialog: the screenshot and HTML show state 2 and the console has only entries from before the pick', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,
@@ -230,7 +230,7 @@ test.describe('the capture is taken at the pick (025-AC-067)', () => {
     expect(near(png.at((box.x + box.width / 2) * dpr, (box.y + box.height / 2) * dpr), STATE_2, 6), 'state 2 colour in the screenshot').toBe(true)
   })
 
-  test('Up in the menu moves the capture to the parent with its outline; quick Up and Down presses: the last wins', async ({
+  test('025-AC-067 Up in the menu moves the capture to the parent with its outline; quick Up and Down presses: the last wins', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,

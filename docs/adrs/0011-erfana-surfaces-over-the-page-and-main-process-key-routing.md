@@ -73,3 +73,5 @@ Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e
 | `window.print()` | Blocks the page's script; no `webContents` event, no sheet on the window | S-32: no route for Erfana; the hang probe must not report it as a hang |
 | Camera capture stop (fake device, granted) | No `webContents` event at start or stop | S-32: no end signal; the in-use indicator ends at navigation or tab close |
 | Tab from the last focusable element | Wraps to the first element **inside the page** (`blur`, window `blur`/`focus`, then focus on the first); focus never leaves the view | Decision 14: F6 is the only route out |
+
+**Windows (2026-11-08).** Electron 44.9.3, Windows 11 Pro (x64), the same spec, 1 run: every probe passes. A view detached with `removeChildView` stays `visible` with no `visibilitychange`, but – as on Linux under xvfb – it draws no animation frame until it is attached again, so decision 3's "hidden tabs cost no compositing" holds on Windows. The page-dialog probe checks the window-sheet event on macOS only, so that part of its row is not probed here.

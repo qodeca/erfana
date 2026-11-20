@@ -4,7 +4,8 @@
 #
 # Run the Playwright Electron suite headless on Linux (xvfb) inside Docker.
 #   npm run test:e2e:linux [-- <playwright args>]
-# Without a --project argument it runs --project=electron --project=timing (the timing gates run alone, after it).
+# Without a --project argument it runs --project=electron --project=timing --project=perf (the timing gates,
+# then the heavy perf tests, run alone after it).
 #
 # The repo is bind-mounted read-write, but node_modules and out/ live in named Docker
 # volumes so the host's macOS copies are never overwritten. The npm download cache has
@@ -34,8 +35,11 @@ TEMP_VOLUME="erfana-e2e-temp-$KEY"
 NPM_VOLUME="erfana-e2e-npm-cache-$KEY"
 CONTAINER_HOME=/tmp/home
 
+# Git Bash rewrites "/work"-style container paths into Windows paths; keep them as written.
+export MSYS_NO_PATHCONV=1
+
 if ! docker info >/dev/null 2>&1; then
-  echo "Docker daemon is not running. Start Docker Desktop and retry." >&2
+  echo "Docker daemon is not reachable. Start Docker Desktop, Colima or OrbStack and retry." >&2
   exit 2
 fi
 
@@ -45,9 +49,20 @@ has_project=0
 for arg in "${args[@]+"${args[@]}"}"; do
   case "$arg" in --project|--project=*) has_project=1 ;; esac
 done
-if [ "$has_project" -eq 0 ]; then args=("--project=electron" "--project=timing" "${args[@]+"${args[@]}"}"); fi
+if [ "$has_project" -eq 0 ]; then args=("--project=electron" "--project=timing" "--project=perf" "${args[@]+"${args[@]}"}"); fi
 
 docker build -t "$IMAGE" -f "$ROOT/e2e/docker/Dockerfile" "$ROOT/e2e/docker" || exit 1
+
+# The image builds without the checkout (the build context travels through the API), but the
+# run bind-mounts it. A Docker VM that does not share this folder mounts an empty directory,
+# and the run would fail later with "run-suite.sh: No such file or directory".
+if ! docker run --rm -v "$ROOT":/work "$IMAGE" test -f /work/e2e/docker/run-suite.sh; then
+  echo "Docker cannot see $ROOT: the Docker VM does not share this folder." >&2
+  echo "  Colima: add it under 'mounts:' in ~/.colima/<profile>/colima.yaml (writable: true), then run 'colima restart'." >&2
+  echo "  Docker Desktop: Settings > Resources > File sharing." >&2
+  echo "  OrbStack: shares /Users by default; check that the checkout is under it." >&2
+  exit 2
+fi
 
 # Fresh report folder every run; volumes are created root-owned, so hand them to the host user.
 mkdir -p "$ROOT/$REPORT_DIR"
@@ -60,8 +75,11 @@ docker run --rm --user 0 \
 lock_before="$(hash_text < "$ROOT/package-lock.json")"
 
 # --init reaps the zombie processes Electron leaves; /dev/shm is enlarged for Chromium.
+# --ulimit core=0: a crashed renderer would otherwise drop a core dump (over 200 MB)
+# into the checkout root, which /work is.
 docker run --rm \
   --init \
+  --ulimit core=0 \
   --shm-size="${ERFANA_E2E_LINUX_SHM:-1g}" \
   --user "$(id -u):$(id -g)" \
   -e HOME="$CONTAINER_HOME" \

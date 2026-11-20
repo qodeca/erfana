@@ -31,7 +31,7 @@ import { loadMarkdownIt, markdownItVersion } from './__test-helpers__/corpusOrac
 import { kindSection, parseCorpusSummary, summaryBlock, totalsOf, type CorpusSummary } from './__test-helpers__/corpusReport'
 import { CORPUS_AUTHOR, runCorpusFile, type FileOutcome } from './__test-helpers__/corpusRunner'
 import { markdownSizeOf, sizeTable, type MarkdownSize } from './__test-helpers__/corpusSizes'
-import { collectCorpus, extraRootsFromEnv, manifestText, sha256, snapshotCorpus, type CorpusEntry, type ExtraRoot } from './__test-helpers__/corpusSources'
+import { collectCorpus, extraRoots, manifestText, sha256, snapshotCorpus, type CorpusEntry, type ExtraRoot } from './__test-helpers__/corpusSources'
 import { TARGETS_PER_FILE } from './__test-helpers__/corpusTargets'
 
 const ROOT = join(__dirname, '..', '..', '..', '..', '..')
@@ -184,14 +184,28 @@ function shardIndices(entries: readonly CorpusEntry[], of: number): number[][] {
   return shards.map(shard => shard.indices.sort((a, b) => a - b))
 }
 
+/** The `CORPUS_EXTRA_ROOTS=…` prefix a rerun needs: none when every extra root is a fetched source. */
+function envExtras(extras: readonly ExtraRoot[]): string {
+  const named = extras.filter(x => x.url === undefined)
+  return named.length === 0 ? '' : `CORPUS_EXTRA_ROOTS='${JSON.stringify(named)}' `
+}
+
 /** Where a limited trial writes: never over the committed report. */
 const outputDir = (): string => (process.env.CORPUS_LIMIT ? join(ROOT, 'temp', 'corpus') : VERIFICATION)
 const shardFile = (shard: number, of: number): string => join(SHARD_DIR, `shard-${shard}-of-${of}.json`)
 
 describe.runIf(process.env.CORPUS_COLLECT === '1')('corpus round trip (collects the corpus)', () => {
   it('builds the corpus from files on disk and freezes it in the git-ignored cache', () => {
-    const extras = extraRootsFromEnv()
+    const extras = extraRoots(ROOT)
     const frozen = snapshotCorpus(collectCorpus(ROOT, extras), CACHE_DIR)
+    const count = (kind: CorpusEntry['kind']): number => frozen.entries.filter(e => e.kind === kind).length
+    // Stop here, not an hour later at the merge, when the corpus cannot reach 024-AC-026's floor.
+    if (process.env.CORPUS_LIMIT === undefined && (count('markdown') < MIN_MARKDOWN_FILES || count('html') < MIN_HTML_FILES)) {
+      throw new Error(
+        `corpus: ${count('markdown')} Markdown and ${count('html')} HTML files, below 024-AC-026's ${MIN_MARKDOWN_FILES} and ${MIN_HTML_FILES}. ` +
+          `Run \`npm run corpus:fetch\` (pinned sources), or name more files in CORPUS_EXTRA_ROOTS.`
+      )
+    }
     const collected: CollectedCorpus = { entries: [...frozen.entries], skippedNotPermissive: frozen.skippedNotPermissive, skippedDuplicate: frozen.skippedDuplicate, extras }
     mkdirSync(join(ROOT, 'temp', 'corpus'), { recursive: true })
     writeFileSync(COLLECTION, JSON.stringify(collected))
@@ -256,8 +270,9 @@ describe.runIf(process.env.CORPUS_MERGE === '1')('corpus round trip (merges the 
       dirty: git('status', '--porcelain') !== '',
       manifestHash: sha256(manifest),
       skipped: { notPermissive: skippedNotPermissive, duplicate: skippedDuplicate },
-      extras: extras.length === 0 ? 'none' : extras.map(x => `${x.label} (${x.licence}, ${x.dir})`).join('; '),
-      rerun: `${extras.length === 0 ? '' : `CORPUS_EXTRA_ROOTS='${JSON.stringify(extras)}' `}CORPUS_SEED=${seed} CORPUS_SHARDS=${of} npm run test:corpus`,
+      // A fetched source is named by its pinned archive, never by this machine's path.
+      extras: extras.length === 0 ? 'none' : extras.map(x => `${x.label} (${x.licence}, ${x.url ?? x.dir})`).join('; '),
+      rerun: `${envExtras(extras)}CORPUS_SEED=${seed} CORPUS_SHARDS=${of} npm run test:corpus`,
       minutes,
       shards: of
     }

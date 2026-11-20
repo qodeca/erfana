@@ -15,6 +15,7 @@ import { sep } from 'path'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import type { GitDisplayStatus } from '../../src/shared/ipc/git-schema'
 import { byTestId, byDynamicTestId, waitForTestId, waitForTestIdHidden } from '../utils/locators'
+import { dismissToastsOver } from '../utils/toast'
 
 export class ProjectTreePage {
   constructor(private readonly page: Page) {}
@@ -26,7 +27,9 @@ export class ProjectTreePage {
 
   // TODO(spec-018): Extract to SettingsPage or AppPage when scope grows
   async openSettings(): Promise<void> {
-    await byTestId(this.page, TEST_IDS.ACTIVITY_BAR_BTN_SETTINGS).click()
+    const settings = byTestId(this.page, TEST_IDS.ACTIVITY_BAR_BTN_SETTINGS)
+    await dismissToastsOver(this.page, settings)
+    await settings.click()
     await waitForTestId(this.page, TEST_IDS.SETTINGS_OVERLAY)
   }
 

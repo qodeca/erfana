@@ -86,7 +86,7 @@ Cut, Copy, Paste and Delete are built by one helper, `clipboardMenuItems` (`comp
 | Delete (text) | ⌫ | Delete | Removes the selection; disabled without one; the clipboard is untouched |
 | Delete (tree item) | ⌘⌫ | Delete | `isTreeDeleteKey` in `ProjectTree/treeKeyboard.ts`; runs the menu's own delete command (`deleteCommandFor`), confirmation included. Never on the project root row, never on an auto-repeat |
 
-The tree's Cut, Copy and Paste keys act on the focused row – a file row too – and fall back to the clicked folder; Paste on a file row (menu or key) lands in the file's folder (`PasteIntoParentFolderCommand`). The project root row shows no hints, because none of those keys act on it.
+The tree's Cut, Copy and Paste keys act on the focused row – a file row too – and fall back to the selected folder; Paste on a file row (menu or key) lands in the file's folder (`PasteIntoParentFolderCommand`). The project root row shows no hints, because none of those keys act on it.
 
 ## DevTools
 

@@ -15,6 +15,11 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `npm run test:preload` — preload tests
 - Run `npm run test` for current test count
 
+#### Spec 024 measurement reports (opt-in, never in the default suite)
+- `npm run test:corpus` – the real-file corpus round trip (024-NFR-003, 024-AC-026). It first runs `npm run corpus:fetch` (`scripts/fetch-corpus.mjs`), which downloads the pinned extra sources once – today the Python 3.14.9 HTML docs (PSF-2.0, 579 HTML files), SHA-256-checked – into the git-ignored `temp/corpus/sources/`. With them every machine reaches the 500-HTML-file floor; without them the repository and `node_modules` give about 150, and the collect step stops with that count and the fix. `CORPUS_EXTRA_ROOTS` (a JSON array of `{ label, dir, licence }`) replaces the fetched sources; `CORPUS_LIMIT=<n>` is a short trial that writes to `temp/corpus/` only.
+- `npm run test:timing` – the large-file timing floor (024-NFR-001, 024-AC-024), alone, with the production package conditions the app ships (`vitest.corpus.config.ts` sets `NODE_ENV=production` for it).
+- Both **write the committed reports** in `specs/spec-t3-024-unified-comments/verification/` (`corpus-round-trip.md` and `corpus-manifest.tsv`, `large-file-timing.md`), which the ordinary `main` run then re-checks in CI. Commit a new report on purpose, from a full run; otherwise `git restore` that folder.
+
 #### Renderer tips
 - When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:
   - `vi.mock('@xterm/xterm', () => ({ Terminal: class { open(){} loadAddon(){} dispose(){} write(){} cols=80; rows=24 } }))`
@@ -165,7 +170,7 @@ Screenshot-based comparison for 6 core UI states:
 - **(f)** Image viewer toolbar – narrow panel (#73); the only case about a single row rather than a whole window, and it seeds its image fixtures through its own extended test object so states (a)–(e) keep byte-identical baselines
 
 **Key details**:
-- Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`). Both the `darwin` and the `win32` set are committed for all six states; the `win32` set was regenerated on 2026-09-04 after page-level captures were clipped. The seven built-in browser captures (`visual-regression.browser.e2e.ts`, #448) have a `darwin` set only so far – see [e2e-testing.md § Playwright configuration](./e2e-testing.md#playwright-configuration)
+- Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`). Both the `darwin` and the `win32` set are committed for all six states; the `win32` set was regenerated on 2026-09-04 after page-level captures were clipped. The seven built-in browser captures (`visual-regression.browser.e2e.ts`, #448) have both sets – see [e2e-testing.md § Playwright configuration](./e2e-testing.md#playwright-configuration)
 - Deterministic rendering: the fixture pins the window's content size (`VISUAL_CONTENT_SIZE` in `e2e/fixtures/index.ts`: 1384x861 on Windows, 1400x868 on macOS – the content area of the app's default window, which the baselines were captured at) and checks the size was granted; 1x DPR (`--force-device-scale-factor=1`); page-level captures (a)–(c) pass `clip: PAGE_CLIP`, a 1280x800 rectangle. Before #267 the resize ran before the window existed and usually did nothing, so a slow run that let it land failed all five cases. Element-level captures (d)–(f) need no clip
 - Monaco cursor blink disabled; minimap and scrollbar masked
 - A missing baseline does **not** skip: `assertBaselineExists()` throws, and `playwright.config.ts` sets `updateSnapshots: 'none'`, so nothing is auto-written on a first run. Generate a new platform's set with `npm run test:e2e:update-screenshots` and commit it

@@ -70,10 +70,10 @@ npm run build:mac:test
 
 ### Headless on Linux in Docker
 
-The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Docker Desktop must be running.
+The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Any Docker engine works – Docker Desktop, OrbStack or Colima – but the checkout must be shared into the Docker VM. Docker Desktop and OrbStack share `/Users` by default. Colima shares only what `mounts:` lists in `~/.colima/<profile>/colima.yaml`: add the checkout's folder (`writable: true`) and run `colima restart`. The script checks this before the run and stops with the fix when the folder is not shared (before 2026-11-08 the run failed later with `run-suite.sh: No such file or directory`). On Windows, run it from WSL; Git Bash also works, because the script sets `MSYS_NO_PATHCONV=1` so Git Bash does not rewrite the container paths. `npm run doctor` shows whether Docker sees the checkout.
 
 ```bash
-# Whole functional suite, then the timing gates alone (--project=electron --project=timing is added when you pass no --project)
+# Whole functional suite, then the timing gates, then the perf tests, each alone (--project=electron --project=timing --project=perf is added when you pass no --project)
 npm run test:e2e:linux
 
 # Any Playwright arguments pass through
@@ -97,9 +97,25 @@ The full suite was tested at 8 CPUs, 32 GB and `ERFANA_E2E_LINUX_SHM=4g`. Use at
 - A small machine can fail a heavy test for lack of resources. In a Docker machine with 6 CPUs and 12 GB, the 25 MB page in `e2e/html-preview-comments.perf.e2e.ts` (F-002) did not finish its reload in 600 s. With 8 CPUs, 32 GB and 4 GB of shared memory it finished: median 38.5 s with comments on, 19.0 s with them off ([known limits](../../specs/spec-t3-024-unified-comments/verification/known-limits.md)).
 - On Colima, `colima start` for a new profile makes that profile the current Docker context. Restore your previous context afterwards (`docker context use <name>`), and pass the profile to a run through `DOCKER_CONTEXT` (`DOCKER_CONTEXT=colima-<profile> npm run test:e2e:linux`), which the script's `docker` calls honour.
 
+#### From a Windows host
+
+Run the script from Git Bash with Docker Desktop's `docker.exe` on `PATH`. Git Bash rewrites arguments that start with `/` (and `name:/path` volume
+pairs) into Windows paths, which breaks the script's `docker run` mounts and `HOME=/tmp/home`; `MSYS2_ARG_CONV_EXCL` turns that off for the listed
+prefixes. Verified 2026-11-08 (Windows 11, Docker Desktop, no WSL integration):
+
+```bash
+export PATH="$PATH:/c/Program Files/Docker/Docker/resources/bin"
+export MSYS2_ARG_CONV_EXCL="erfana-e2e;/work;HOME=;/tmp;$PWD:"   # run from the repo root
+bash scripts/e2e-linux.sh
+```
+
+Do not run the Windows e2e suite at the same time: both share the CPU, the Linux run takes several times longer, and `@os-focus` tests fail
+with `os-focus lock: no exclusive lease within 170000 ms`. One test has failed only in this setup (Docker on a Windows host): see the `browser-capture-content.e2e.ts:338` row in the
+[Windows flake register](../windows/known-flakes.md#register).
+
 #### A full run is noisy
 
- With 2 workers, `dockview-resize` and the `file-operations` copy test have each failed once in a full run and then passed alone 3 of 3. The timing gates (`*.timing.e2e.ts`) no longer run beside them: they are the `timing` project, which runs after `electron` with one worker, because 024-AC-024's save P95 missed its budget under load (1,001 ms) while it is about 780 ms alone (owner decision 2026-11-04). Rerun a failing test alone before you treat it as real.
+ With 2 workers, `dockview-resize` and the `file-operations` copy test have each failed once in a full run and then passed alone 3 of 3. The timing gates (`*.timing.e2e.ts`) no longer run beside them: they are the `timing` project, which runs after `electron` with one worker, because 024-AC-024's save P95 missed its budget under load (1,001 ms) while it is about 780 ms alone (owner decision 2026-11-04). The heavy perf tests (`*.perf.e2e.ts`) are the `perf` project, which runs after `timing` with one worker: on 2026-11-08 F-002 held a shared [focus-lock](#os-keyboard-focus-the-focus-lock) lease for 6.5 minutes beside the functional suite, longer than an exclusive waiter's 170 s, so `html-preview-keyboard-focus.e2e.ts` timed out. The same run also failed `browser-tab-isolation.e2e.ts` 025-AC-046 (the popup button moved under the click while the canary list grew – the test now waits for the canary first) and `browser-tab-chrome.e2e.ts` 025-AC-008 (the zoom chip was missing: the zoom was 125 %, but the address needed the room, so fold step 3 had moved the chip into **More**, as designed; the test now reads the zoom from main's tab state, then from the chip or from More, by the row's `data-fold`). All three passed alone. Rerun a failing test alone before you treat it as real.
 
 `--no-sandbox` is not needed: Playwright's `electron.launch` adds it itself unless `chromiumSandbox: true` is passed, and nothing in the app code or the fixtures changes for the container. The one environment change the fixtures needed is `XAUTHORITY` in the env allowlist (`e2e/fixtures/isolation.ts`): `xvfb-run` protects its display with an auth file, and without the variable the app cannot open the display.
 
@@ -107,7 +123,7 @@ The script sets `ERFANA_E2E_LINUX_CONTAINER=1`. Tests read it only through `IS_L
 
 **Not run in the container**
 
-- The `visual` project: its baselines are `-darwin` PNGs (see `snapshotPathTemplate`), and there are no Linux baselines.
+- The `visual` project: its baselines are `-darwin` and `-win32` PNGs (see `snapshotPathTemplate`), and there are no Linux baselines.
 - The `transcription` project: needs `ERFANA_E2E_TRANSCRIPTION=1` and an API key, as everywhere.
 
 **Skipped or adapted in the container**
@@ -136,6 +152,38 @@ One test helper was changed for the container, safely for macOS and Windows too:
 
 - `/bin/sh` is linked to bash in the image. `ERFANA_E2E_FAST_SHELL` tests exec `/bin/sh -i`, which is bash on macOS; Ubuntu's dash made the blank-terminal race above more likely.
 - Without a window manager Monaco-heavy specs lose focus and window maximize does nothing, so `e2e/docker/run-under-xvfb.sh` starts openbox before Playwright.
+- The container runs with `--ulimit core=0`. Before that, a crashed renderer left a core dump of over 200 MB in the checkout root (seen 2026-11-08), because the checkout is the container's `/work`.
+
+### macOS in a virtual machine (Tart)
+
+A local `npm run test:e2e` needs someone at the Mac: the [focus tests](#os-keyboard-focus-the-focus-lock) need Erfana to be the OS key window, and macOS gives that to no window while the screen is locked. A run with the screen locked failed all 167 of them with "the OS would not make Erfana the key window" (2026-11-08). `npm run test:e2e:macos-vm` runs the same suite in a macOS virtual machine on the same Mac. The VM has its own display, logs in automatically and has no screen lock, so the run does not depend on the host screen.
+
+```bash
+npm run test:e2e:macos-vm                        # electron, timing and perf, as test:e2e
+npm run test:e2e:macos-vm -- e2e/foo.e2e.ts:42   # any Playwright arguments pass through
+```
+
+**One-time setup** (Apple Silicon only):
+
+1. Install [Tart](https://github.com/openai/tart) 2.41 or later. The Homebrew tap `cirruslabs/cli` fails on current Homebrew (2026-11-10), so download `tart.tar.gz` from the [releases page](https://github.com/openai/tart/releases), check it against `tart_<version>_checksums.txt`, unpack `tart.app` into `~/Applications` and link `tart.app/Contents/MacOS/tart` into your `PATH`.
+2. Nothing else. The first run creates the VM `erfana-e2e` from `ghcr.io/cirruslabs/macos-tahoe-base:latest` (about 33 GB, once), with 6 CPUs, 16 GB memory, a 90 GB disk and a 1920×1200 display (some tests widen the window to 1800 px). That image already has the Command Line Tools, automatic login and the screen lock off. Its Homebrew Node is not used: the script installs the nodejs.org build of the `.nvmrc` major into `/Users/admin/.erfana-node` (checked against `SHASUMS256.txt`), because the 025-AC-077 shell-guard tests run a copy of the node binary under another name (`ssh`, `nu.exe`), and Homebrew's node cannot load its separate `libnode.dylib` from there. `npm run doctor` warns about such a Node on any machine.
+
+**How it works** (`scripts/e2e-macos-vm.sh`):
+
+- It starts the VM headless (no window) when it is not running, and stops it at the end only if it started it.
+- Nothing on the host is shared into the VM. The script streams in only the files git tracks or would add (`git ls-files --cached --others --exclude-standard`), so ignored files such as `signing-secrets.local` and `.env` never reach it, and it streams the reports back into `.local/e2e-macos-vm/` (git-ignored).
+- `node_modules` and `out/` stay in the VM between runs. `npm ci` runs again only when `package-lock.json` changes.
+- Commands run through `tart exec` (the Tart guest agent), which runs them in the logged-in desktop session, so the app's windows can take focus.
+- It sets `ERFANA_E2E_MACOS_VM=1`. The `timing` project then records 024-AC-024's numbers without gating them, as on Windows: a VM is not the reference hardware (save P50 1,256 ms in the VM against about 780 ms on the host, 2026-11-10). Gate the timing budget with `npm run test:e2e` on the Mac itself.
+- Full-run failures the VM found (2026-11-10 to 2026-11-13), all fixed; the full run after the fixes passed 800 of 800 (1 skipped):
+  - `browser-certificates-auth.e2e.ts` 025-AC-021 – an app race, not a test fault. The refused load's own `did-fail-load` (and with it its history entry) could arrive after **Proceed anyway** or **Back to safety**: the tab then showed the load-error page over the loaded page or the empty tab, or did not step back. `BrowserTabPage` never turns a certificate error code into the load-error page (the same race on Windows, fixed there first – `isCertificateError` in `netErrorMessages.ts`), and `TabCertificates` steps back once the refused load's failure arrives. Reproduced 2 in 96 and 1 in 96 before, 0 in 96 after (8 repeats, 2 workers).
+  - `browser-send.e2e.ts` 025-AC-070 (the send notice) – 45–48 s alone in the VM, over the 60 s limit under load; it now has 120 s.
+  - `clipboard-actions.e2e.ts` Shift+F10 – the "Project Opened" toast covered the Settings button and paused under the pointer Playwright parked on it. `ProjectTreePage.openSettings()` dismisses a toast over the button first (`dismissToastsOver`, `e2e/utils/toast.ts`).
+  - `markdown-preview-comments.e2e.ts` I-14 failed once and passed in every later run.
+
+**What the first VM run found** (2026-11-10): 25 tests failed because the VM has only macOS's own `openssl` (LibreSSL 3.3), and `e2e/fixtures/browser/certs/generate.sh` then wrote EC keys with explicit curve parameters (Chromium and Node refuse them: "Certificate public key has explicit ECC parameters") and a CA named `placeholder` (LibreSSL ignores `-subj` when the config sets `prompt = no`). The script now asks for named curves and keeps the CA name in its config, so both OpenSSL and LibreSSL write the same certificates. Any Mac without Homebrew's OpenSSL had the same failures.
+
+Variables: `ERFANA_E2E_VM` (VM name, default `erfana-e2e`) and `ERFANA_E2E_VM_IMAGE` (base image). Tart's licence is FSL-1.1-ALv2: any use except a product that competes with Tart.
 
 ---
 
@@ -173,7 +221,7 @@ prompt-actions panel, the instruction dialog, and the certificate, load-error an
 native view and never appears in a window screenshot; the still image is a canvas in Erfana's DOM, so it does. Three things keep them
 deterministic, and each is needed:
 
-- **The target terminal runs the stub agent (`cat`).** With the bare shell the row, panel and dialog name the host's login shell and the panel adds a
+- **The target terminal runs the stub agent (`ECHO_AGENT`).** It is `cat`, or `node` on Windows, so the drawn name differs per platform. With the bare shell the row, panel and dialog name the host's login shell and the panel adds a
   shell-guard banner that wraps by that name. The agent is started from a first tab and the tab under test opened after it, because a tab reads its
   target as it opens.
 - **Ports are pinned in the drawn text.** The fixture servers listen on OS-assigned ports; `pinPortText()` replaces the port number in the panel's
@@ -184,10 +232,14 @@ deterministic, and each is needed:
 
 The two visual option fixtures on `visualTest` (`e2e/fixtures/index.ts`) default to the old behaviour, so the six core baselines launch exactly as before:
 `visualExtraLaunchArgs` (extra Chromium switches for both visual apps; the browser cases pass `BROWSER_CHROMIUM_ARGS`) and `visualResetRendererStorage`.
-Both visual specs share `assertBaselineExists` from `e2e/utils/visual-baseline.ts`. **Only the darwin set of the browser baselines exists** (generated
-2026-11-03): until a Windows host runs `npm run test:e2e:update-screenshots -- missing e2e/visual-regression.browser.e2e.ts` and commits the seven
-`*-win32.png` files, the visual suite on Windows fails those seven cases with "Missing visual baseline". The `missing` mode writes only absent baselines, so
-the run cannot rewrite an existing one.
+Both visual specs share `assertBaselineExists` from `e2e/utils/visual-baseline.ts`. The browser baselines exist in both sets: darwin (generated
+2026-11-03) and win32 (2026-11-08). To choose what gets written, build in e2e mode (`npm run build:e2e`), then pass Playwright's mode yourself:
+`npx playwright test --project=visual --update-snapshots=missing` writes only absent baselines and never rewrites an existing one;
+`=changed` also rewrites every existing baseline that fails. Look at every written PNG before committing it.
+
+The `settings-overlay` baseline draws the **Logs folder** row with the worker's temporary home path (`.e2e-temp/home-visual-<n>-<random>`), so a few
+pixels change per run and per machine – within the 1 % `maxDiffPixelRatio`. A settings screen that gains a section needs that baseline regenerated on
+every platform (on 2026-11-08 the darwin one still lacked the **Project tree** section).
 
 See `playwright.config.ts` for the full configuration.
 
@@ -229,7 +281,7 @@ Located in `e2e/pages/`:
 | `BrowserTabUiPage`, `BrowserPanelUi` (`browser-tab-ui.page.ts`) | The browser's renderer UI driven through Erfana's DOM by role and name (commits 17–18). `BrowserTabUiPage`: `newTabButton`, `panels`, `editorTabs`, `visiblePanel()`, `openWithButton()`, `openFromAppMenu()`, `closeAll()`. `BrowserPanelUi` (one panel): `tabId()`, `addressBar`, `navigation`, `button()` / `tool()`, `placeholder`, `refused`, `strip` / `stripRow()` / `answerRow()` (waits out the input guard), `chips`, `findRow` / `findField` / `findCount`, `pageHeading` (the load-error, certificate and crashed pages), `menu()`, `chooseMore()`, `load()`, `waitForState()`, `page()`, `hookTab()`, `waitForAttached()` |
 | `PickDriver` (`browser-pick.page.ts`) | Pick and send below the UI (commits 14–15): calls the bridge (`mode()`, `refine()`, `close()`, `write()`, `discard()`, `targetStatus()`) and reads main through the `pick` hook (`highlight()`, `state()`, `events()` / `waitForEvent()`); pointer and keys through main-side input (`rect()`, `move()`, `key()`, `hover()`, `waitForLabel()`). Also `mainHook()`, `openPicker()`, `expectBoxNear()`, `PICK_WAIT_MS` |
 | `BrowserPickUi` (`browser-pick-ui.page.ts`) | The pick row, the prompt-actions panel and the instruction dialog over the still image (commit 19), by role and name – `row`, `pickButton`, `status`, `target`, `still`, `actions`, `dialog`, `action(name)`, `driver()`, `confirm()` (hover, Return, wait for the panel) |
-| `PickFlow`, `AgentTerminal`, `NoKeyTrap` (`browser-pick-flow.page.ts`) | The whole pick-and-send flow of one tab as a user drives it, on top of `BrowserPickUi` and `PickDriver`. `PickFlow`: `open()`, `load()`, the panel's header and dialog controls (`parentButton`, `childButton`, `path` / `crumb()` / `chip`, `closeButton`, `panelNote`, `panelTarget`, `dialogField` / `dialogSend` / `dialogCancel` / `dialogBack`, `showTerminal`, `openCapture`, `frame`, `statusChip`), the status slot as read (`statusText()`, `expectStatus()`, `recordStatus()` / `statusLog()` / `shownFor()`), main's state (`state()`, `highlightLabel()`, `waitForActive()`, `waitForFrozen()`, `routing()`, `waitForPageFocus()`, `focusErfana()`, `passClickWindows()` on the test clock), raw page input (`input()`, `move()`, `click()`, `key()`, `keyWithRepeats()`, `pickKey()`), `hover()`, `pickByClick()`, `pickByShortcut()`, `setTabWidth()`, `trustTestCa()`, paint reads (`livePaint()`, `windowPaint()`), the live outline's band read natively (`outlineBand()`: the band window's visibility, bounds and strip views over the page view's screen place, with main's tones and colours – the band never shows in `livePaint()`) and CDP watches. `AgentTerminal`: the app's terminal with `cat` in front, a stub agent (`open()`, `start()`, `text()`, `count()`). `NoKeyTrap`: the no-key trap of 025-AC-083 (`arm()`, `expectNoKeys()`). Plus capture-file readers (`capturesDir()`, `contextFiles()`, `newCapture()`, `captureBox()`, `readPng()`) |
+| `PickFlow`, `AgentTerminal`, `NoKeyTrap` (`browser-pick-flow.page.ts`) | The whole pick-and-send flow of one tab as a user drives it, on top of `BrowserPickUi` and `PickDriver`. `PickFlow`: `open()`, `load()`, the panel's header and dialog controls (`parentButton`, `childButton`, `path` / `crumb()` / `chip`, `closeButton`, `panelNote`, `panelTarget`, `dialogField` / `dialogSend` / `dialogCancel` / `dialogBack`, `showTerminal`, `openCapture`, `frame`, `statusChip`), the status slot as read (`statusText()`, `expectStatus()`, `recordStatus()` / `statusLog()` / `shownFor()`), main's state (`state()`, `highlightLabel()`, `waitForActive()`, `waitForFrozen()`, `routing()`, `waitForPageFocus()`, `focusErfana()`, `passClickWindows()` on the test clock), raw page input (`input()`, `move()`, `click()`, `key()`, `keyWithRepeats()`, `pickKey()`), `hover()`, `pickByClick()`, `pickByShortcut()`, `setTabWidth()`, `trustTestCa()`, paint reads (`livePaint()`, `windowPaint()`), the live outline's band read natively (`outlineBand()`: the band window's visibility, bounds and strip views over the page view's screen place, with main's tones and colours – the band never shows in `livePaint()`) and CDP watches. `AgentTerminal`: the app's terminal with an echo program in front, a stub agent (`open()`, `start()`, `text()`, `count()`) – `cat` on macOS and Linux, `node -e "process.stdin.pipe(process.stdout)"` on Windows (`ECHO_AGENT` in `e2e/fixtures/browser/echoAgent.ts`; Git Bash's `cat` is an MSYS program whose Windows parent pid is dead, so the foreground walk never sees it and the target stays a bare shell). `NoKeyTrap`: the no-key trap of 025-AC-083 (`arm()`, `expectNoKeys()`). Plus capture-file readers (`capturesDir()`, `contextFiles()`, `newCapture()`, `captureBox()`, `readPng()`) |
 | `BrowserSendUi`, `StubAgent` (`browser-send.page.ts`) | Pick and send end to end with a terminal running a program the test chose. `BrowserSendUi`: `open()`, `startStubAgent()` (the recording `fixtures/browser/stub-agent.cjs`) / `startStubAs()` / `stopStub()` / `startShell()` / `run()`, `waitForTarget()`, `load()`, `pickElement()` / `pickAt()`, `explainAndRead()`, `openDialog()`, the send notice and banner, toast recording (`recordToasts()`, `errorToasts()`, `infoToasts()`), `routingFocus()`, `windowKey()`, `advanceMainClock()`, `pickState()`, `fault()` / `failNextTerminalPaste()`, `captureFiles()` / `waitForCaptureCount()`. `StubAgent`: `received()`, `waitForSubmitted()`, `reset()`. Also `maskCaptureRefs()` |
 | `HostileSuite` (`browser-hostile.page.ts`) | The hostile-page suite (025-AC-046): `open()` a fixture of `e2e/fixtures/browser/hostile/`, `report()` / `finish()` (the canary's attempts with their detail; `finish()` settles refused frames that never answer once a ready condition holds), `sentinel()` (a real click the page counts, before any "nothing happened" read), `mark()` / `expectStayed()` (the tab idle on the same address and the same document after a navigation attempt), `recordShellOpens()` / `shellOpens()` (`shell.openExternal`, `openPath`, `showItemInFolder` recorded), `windowCount()`, `popups()` / `popupExec()`, `frameExec()` (a frame's script with a user gesture), `trustTestCa()`, `expectOnlyTabsInBrowserSession()`. Also `leaks()` |
 | `DownloadsDriver` (`browser-downloads.page.ts`) | Downloads from a browser tab (025-AC-020): the save dialog stubbed and its options recorded (`answerSaveDialog()`, `dialogCalls()`, `dialogPaths()`, `waitForDialogCount()`), the notices (`recordNotices()`, `notices()`, `waitForNotice()`, `doneToast()`, `failedToast()`), **Show in folder** replaced by a recorder (`recordShowInFolder()`, `shownInFolder()`, `showInFolderButton()`), and what is left on disk (`downloadsDir()`, `leftovers()`, `waitForNoLeftovers()`) |

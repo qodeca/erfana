@@ -99,6 +99,23 @@ describe('SiteSecurity', () => {
     expect(states.at(-1)).toEqual({ warning: null, sign: null })
   })
 
+  it('025-AC-021 routes a main-frame load failure to Back to safety answered before the refused load settled', async () => {
+    const link = security.attachTab(ref, strip)
+    contents.commit('https://before.test/')
+    certificateError(contents)
+    await vi.waitFor(() => expect(states.at(-1)?.warning).not.toBeFalsy())
+    expect(link.answerCertificate('d1', false)).toBe('accepted')
+    expect(ref.goBack).not.toHaveBeenCalled()
+    // The refused load's entry comes with its own did-fail-load; a frame's failure is not it.
+    contents.entries = [...contents.entries, { url: PAGE }]
+    contents.index = contents.entries.length - 1
+    contents.url = PAGE
+    contents.emit('did-fail-load', {}, -202, 'ERR_CERT_AUTHORITY_INVALID', PAGE, false)
+    expect(ref.goBack).not.toHaveBeenCalled()
+    contents.emit('did-fail-load', {}, -202, 'ERR_CERT_AUTHORITY_INVALID', PAGE, true)
+    expect(ref.goBack).toHaveBeenCalledTimes(1)
+  })
+
   it('025-AC-022 routes the tab\'s login to a focused sign-in box for its main-frame navigation', async () => {
     const link = security.attachTab(ref, strip)
     contents.emit('did-start-navigation', { url: 'https://a.test/start', isMainFrame: true })

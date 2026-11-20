@@ -123,6 +123,11 @@ function hostOf(url: string): string | null {
 export class TabCertificates {
   private warning: ShownWarning | null = null
   private subresourceFailed = false
+  /**
+   * **Back to safety** answered before the refused load settled: that load's history
+   * entry comes with its own `did-fail-load`, so the step back waits for it.
+   */
+  private backAfterFailure: string | null = null
   private committedHost: string | null = null
   /** Hosts whose exception let a main-frame load through in this tab. */
   private readonly proceededHosts = new Set<string>()
@@ -163,6 +168,8 @@ export class TabCertificates {
 
   /** A new main-frame document navigation started: the warning page goes. */
   navigationStarted(): void {
+    // A new navigation replaces the refused load: no step back over it any more.
+    this.backAfterFailure = null
     if (this.warning === null) return
     this.warning = null
     this.emit()
@@ -171,6 +178,7 @@ export class TabCertificates {
   /** A main-frame document committed at `url`. */
   committed(url: string): void {
     this.committedHost = hostOf(url)
+    this.backAfterFailure = null
     this.warning = null
     this.subresourceFailed = false
     this.emit()
@@ -198,9 +206,18 @@ export class TabCertificates {
     this.warning = null
     this.emit()
     const contents = this.deps.tab.contents
-    // The failed load left its own history entry: step back over it.
-    if (contents.getURL() === shown.url && contents.navigationHistory.canGoBack()) this.deps.tab.goBack()
+    // The failed load left its own history entry: step back over it. Under load the answer can
+    // come before that entry does (seen in a macOS VM, 2026-11-13): step back once it fails.
+    if (contents.getURL() === shown.url) this.stepBackOver(shown.url)
+    else this.backAfterFailure = shown.url
     return 'accepted'
+  }
+
+  /** A main-frame load of `url` failed: the refused load's entry is there now. */
+  loadFailed(url: string): void {
+    if (!this.open || this.backAfterFailure !== url) return
+    this.backAfterFailure = null
+    this.stepBackOver(url)
   }
 
   /** What the tab shows now. */
@@ -218,6 +235,11 @@ export class TabCertificates {
   detach(): void {
     this.open = false
     this.warning = null
+  }
+
+  private stepBackOver(url: string): void {
+    const contents = this.deps.tab.contents
+    if (contents.getURL() === url && contents.navigationHistory.canGoBack()) this.deps.tab.goBack()
   }
 
   private showWarning(url: string, host: string, fingerprint: string | null, code: number): void {
