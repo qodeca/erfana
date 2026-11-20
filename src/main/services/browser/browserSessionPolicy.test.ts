@@ -66,7 +66,7 @@ describe('permission table', () => {
   })
 
   it('grants only clipboard writes and persistent storage today', () => {
-    const granted = Object.keys(BROWSER_PERMISSION_CLASSES).filter(isPermissionGranted).sort()
+    const granted = Object.keys(BROWSER_PERMISSION_CLASSES).filter((name) => isPermissionGranted(name)).sort()
     expect(granted).toEqual(['clipboard-sanitized-write', 'persistent-storage'])
   })
 
