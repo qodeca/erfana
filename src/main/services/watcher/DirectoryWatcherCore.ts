@@ -14,6 +14,7 @@ import { DEFAULT_TREE_HIDDEN_PATTERNS, DEFAULT_WATCHER_IGNORE_PATTERNS } from '.
 import { ProjectPathFilter, toRootRelative } from '../../utils/projectPathFilter'
 import { RateLimitedLogger } from '../../utils/RateLimitedLogger'
 import { isAtomicTempName } from '../../utils/atomicWrite'
+import { isProbeName } from '../file/entryProbe'
 import type { DirectoryChangedPayload } from '../../../shared/ipc/directory-watch-schema'
 import { KnownEntries } from './KnownEntries'
 import { WatcherMetrics } from './WatcherMetrics'
@@ -27,6 +28,7 @@ import {
 import { createChokidarWatcher, createNativeWatcher } from './directoryWatchBuilders'
 import { DirectoryWatchListeners } from './DirectoryWatchListeners'
 import { WatcherHealthLogger } from './WatcherHealthLogger'
+import { ReleasableWatchHandles } from './releasableWatchHandles'
 import type { DirectoryWatcherServiceOptions, WatchedDirectory } from './directoryWatchTypes'
 
 /** Most resync log lines per window; the rest are counted (#211, D3). */
@@ -68,12 +70,32 @@ export abstract class DirectoryWatcherCore {
   // Removal, lost-removal and coverage listeners (#252)
   protected readonly listeners = new DirectoryWatchListeners()
 
+  // Every native handle, so a delete can let go of those below its folder (#486)
+  protected readonly nativeHandles = new ReleasableWatchHandles()
+
   constructor(options: DirectoryWatcherServiceOptions = {}) {
     this.watchBackend = options.backend ?? selectDirectoryWatchBackend()
   }
 
   protected coverageChanged(): void {
     this.listeners.coverageChanged()
+  }
+
+  /**
+   * Close the native watcher's handles strictly below `realPath` until the
+   * returned re-arm runs (#486): on Windows they would stop the folder from
+   * moving to the Recycle Bin. A handle on the folder itself stays, so its
+   * removal is still heard. The chokidar backend (Linux, and the support
+   * override) is not covered.
+   */
+  async releaseUnder(realPath: string): Promise<() => Promise<void>> {
+    const end = this.nativeHandles.releaseBelow(realPath, this.platformConfig.caseSensitive)
+    return async () => end()
+  }
+
+  /** Native handles open strictly below `realPath` now (the e2e trash hook checks it is 0). */
+  openHandlesUnder(realPath: string): number {
+    return this.nativeHandles.openBelow(realPath, this.platformConfig.caseSensitive)
   }
 
   /** A filter with the default hidden names, these ignore patterns and no exclude list. */
@@ -108,6 +130,10 @@ export abstract class DirectoryWatcherCore {
     // Checked first, on the last path segment, so it holds for the chokidar and
     // the native backend alike (both reach the filter through here).
     if (relPath !== null && isAtomicTempName(relPath)) return true
+    // The in-use probe's temporary name (#486), and anything below it: a
+    // phantom row otherwise, and a watch opened below it would block the
+    // probe's rename back.
+    if (relPath !== null && isProbeName(relPath)) return true
     const filter = this.pathFilter
     const overrunsBefore = filter.excludeMatcher.budgetExceeded
     const dropped = filter.shouldDrop(relPath)
@@ -165,7 +191,8 @@ export abstract class DirectoryWatcherCore {
       onResync: (reason) => this.handleResync(dirPath, reason),
       onOverflow: () => {
         if (!this.isDisposing) this.metrics.recordNativeOverflow()
-      }
+      },
+      fsWatch: this.nativeHandles.fsWatch
     })
   }
 

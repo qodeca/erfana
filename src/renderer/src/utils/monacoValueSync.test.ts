@@ -12,6 +12,7 @@ import type * as monaco from 'monaco-editor'
 import {
   computeMinimalEdit,
   createEditorValueSync,
+  lineEndingOf,
   MAX_PENDING_EMITS,
   MIN_PENDING_CHARS,
   PENDING_CHARS_PER_DOCUMENT,
@@ -35,10 +36,23 @@ function offsetAt(text: string, lineNumber: number, column: number): number {
 
 const SELECTIONS = [{ selectionStartLineNumber: 1 }] as unknown as monaco.Selection[]
 
-function fakeEditor(initial: string) {
+/** Monaco's `EndOfLineSequence`: 0 = LF, 1 = CRLF. */
+const ENDINGS = ['\n', '\r\n'] as const
+
+/**
+ * A model that keeps one line ending, like Monaco's: inserted line breaks
+ * take it, and `pushEOL` rewrites every break to the new one.
+ */
+function fakeEditor(initial: string, eol: '\n' | '\r\n' = '\n') {
   let text = initial
+  let ending: '\n' | '\r\n' = eol
   const model = {
     getValue: vi.fn(() => text),
+    getEOL: vi.fn(() => ending),
+    pushEOL: vi.fn((sequence: number) => {
+      ending = ENDINGS[sequence]
+      text = text.replace(/\r?\n/g, ending)
+    }),
     setValue: vi.fn((next: string) => {
       text = next
     }),
@@ -49,7 +63,7 @@ function fakeEditor(initial: string) {
         for (const op of ops) {
           const start = offsetAt(text, op.range.startLineNumber, op.range.startColumn)
           const end = offsetAt(text, op.range.endLineNumber, op.range.endColumn)
-          text = text.slice(0, start) + (op.text ?? '') + text.slice(end)
+          text = text.slice(0, start) + (op.text ?? '').replace(/\r?\n/g, ending) + text.slice(end)
         }
         return null
       }
@@ -291,5 +305,47 @@ describe('createEditorValueSync', () => {
     sync.resetTo(fake.editor, 'latest')
     sync.resetTo({ getModel: () => null, getSelections: () => null }, 'x')
     expect(fake.model.setValue).not.toHaveBeenCalled()
+  })
+})
+
+describe('line endings of an outside change (#478 F15, QG-8 S2)', () => {
+  it('lineEndingOf reads the first line break, like the disk reader', () => {
+    expect(lineEndingOf('a\r\nb\nc')).toBe('\r\n')
+    expect(lineEndingOf('a\nb\r\nc')).toBe('\n')
+    expect(lineEndingOf('\nb')).toBe('\n')
+    expect(lineEndingOf('no break')).toBeNull()
+  })
+
+  it('an outside LF→CRLF change keeps CRLF in the buffer, so the next autosave writes CRLF', () => {
+    const fake = fakeEditor('line 1\nline 2\n')
+    const sync = createEditorValueSync()
+
+    expect(sync.reconcile(fake.editor, 'line 1\r\nline 2\r\nfrom disk\r\n')).toBe('applied')
+
+    // What an autosave reads (`getValue`) is the disk's text, endings included
+    expect(fake.model.getValue()).toBe('line 1\r\nline 2\r\nfrom disk\r\n')
+    expect(fake.model.getEOL()).toBe('\r\n')
+  })
+
+  it('an outside change that only swaps CRLF for LF is applied, not taken as in sync', () => {
+    const fake = fakeEditor('a\r\nb\r\n', '\r\n')
+    const sync = createEditorValueSync()
+
+    expect(sync.reconcile(fake.editor, 'a\nb\n')).toBe('applied')
+    expect(fake.text()).toBe('a\nb\n')
+    expect(fake.model.pushEditOperations).not.toHaveBeenCalled()
+    // One undo step of its own, as for any outside change
+    expect(fake.model.pushStackElement).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the model ending when the incoming text has no line break or the same one', () => {
+    const crlf = fakeEditor('a\r\nb', '\r\n')
+    expect(createEditorValueSync().reconcile(crlf.editor, 'single line')).toBe('applied')
+    expect(crlf.model.pushEOL).not.toHaveBeenCalled()
+
+    const lf = fakeEditor('a\nb')
+    expect(createEditorValueSync().reconcile(lf.editor, 'a\nb\nc')).toBe('applied')
+    expect(lf.model.pushEOL).not.toHaveBeenCalled()
+    expect(lf.text()).toBe('a\nb\nc')
   })
 })

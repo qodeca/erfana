@@ -21,34 +21,21 @@
  */
 
 import { IMAGE_EXPORT } from '../../../../../shared/ipc/image-export-schema'
-import { WATCHED_FILES_CAP } from '../../../constants/fileWatch'
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /**
- * Why auto-refresh is unavailable for a file.
+ * What the banner is showing, if anything.
  *
- * - `limit` – `file-watch:start` refused because the app-wide
- *   `MAX_WATCHED_FILES` cap ({@link WATCHED_FILES_CAP} watched files) is full.
- *   Attributed only when the refusal carries the cap's own error, never by
- *   elimination.
- * - `watcher-error` – every other way the watch can be dead: it existed and
- *   then died (`file-watch:error`), the main process told us a project switch
- *   invalidated it, or `start` failed for a reason that is not the cap.
+ * - `notice` – the tab's freshness notice (#478, plan § 3.6): deleted, content
+ *   that cannot be shown, a stopped or queued watch, limited live refresh.
+ *   Its words come from `freshnessNoticeCopy`, shared with the editor.
+ * - `stale` – the watch is fine and the read was too, but the bytes would not
+ *   paint, so the image on screen is older than the file on disk.
  */
-export type WatchUnavailableReason = 'limit' | 'watcher-error'
-
-/**
- * Which degradation the banner is reporting, if any.
- *
- * - `deleted` – the file is gone from disk and was still gone when re-checked.
- * - `unavailable` – the watch is dead, so nothing will arrive by itself.
- * - `stale` – the watch is alive and fired, but the re-read failed, so the
- *   image on screen is older than the file on disk.
- */
-export type ViewerBannerVariant = 'deleted' | 'unavailable' | 'stale'
+export type ViewerBannerVariant = 'notice' | 'stale'
 
 /**
  * How a user-initiated Reload failed.
@@ -77,11 +64,9 @@ export type ViewerStatusTone = 'neutral' | 'positive' | 'warning'
 
 /** Inputs to {@link getBannerVariant}. */
 export interface BannerVariantInput {
-  /** The file was deleted on disk and was still gone when re-checked. */
-  isFileDeleted: boolean
-  /** The watch is dead: start failed, errored, or the session ended. */
-  isWatchUnavailable: boolean
-  /** The most recent re-read failed, so the painted image is behind the file. */
+  /** The tab has a freshness notice to show. */
+  hasNotice: boolean
+  /** The last bytes would not paint, so the image on screen is behind the file. */
   isStale: boolean
 }
 
@@ -130,27 +115,12 @@ export const VIEWER_STATUS_COPY = {
 } as const
 
 /**
- * Banner copy: the only place cause and remedy are stated in VISIBLE text.
- *
- * The editor's precedent ("This file was deleted on disk. Save to restore it.")
- * is impossible in a read-only viewer, so the viewer states what it is showing
- * and offers Reload instead.
- *
- * The `limit` wording names the cap, because "too many files are open" left the
- * user pressing Reload against a cap that was still full with no way to learn
- * that closing tabs is the fix.
+ * Banner copy for the one state that is the viewer's own: bytes that were
+ * read but would not paint. Every other banner sentence is the shared
+ * freshness notice (`freshnessNoticeCopy`), so the editor and the viewer say
+ * the same thing the same way.
  */
 export const VIEWER_BANNER_COPY = {
-  deleted: 'This file was deleted on disk. Showing the last version that was loaded.',
-  // NOTE: the number is `MAX_WATCHED_FILES` from the main process, re-exported
-  // through the renderer constant so the two cannot drift (see the guard test
-  // in `constants/fileWatch.test.ts`).
-  unavailableLimit:
-    `Auto-refresh is unavailable – Erfana is watching its maximum of ${WATCHED_FILES_CAP} files. ` +
-    'Close some tabs, then choose Reload.',
-  unavailableWatcherError:
-    'Auto-refresh is unavailable – the file watcher stopped. Showing the version that was ' +
-    'loaded. Choose Reload to try again.',
   stale:
     'Could not load the latest version of this file. Showing the version that was loaded. ' +
     'Choose Reload to try again.'
@@ -264,58 +234,20 @@ export const IMAGE_EXPORT_TOAST_COPY = {
 // ============================================================================
 
 /**
- * Resolves which degradation the banner reports, if any.
- *
- * Precedence is "most specific cause first": a deleted file explains a failed
- * re-read, and a dead watch explains why nothing arrives, so either outranks
- * the generic "the last read failed".
- *
- * @param input - Current degraded state
- * @returns The banner variant, or `null` when nothing is wrong
+ * Resolves what the banner shows, if anything: the freshness notice first –
+ * it explains a failed paint too – then the viewer's own stale state.
  *
  * @example
  * ```ts
- * getBannerVariant({ isFileDeleted: true, isWatchUnavailable: true, isStale: true }) // 'deleted'
- * getBannerVariant({ isFileDeleted: false, isWatchUnavailable: false, isStale: true }) // 'stale'
- * getBannerVariant({ isFileDeleted: false, isWatchUnavailable: false, isStale: false }) // null
+ * getBannerVariant({ hasNotice: true, isStale: true })   // 'notice'
+ * getBannerVariant({ hasNotice: false, isStale: true })  // 'stale'
+ * getBannerVariant({ hasNotice: false, isStale: false }) // null
  * ```
  */
 export function getBannerVariant(input: BannerVariantInput): ViewerBannerVariant | null {
-  if (input.isFileDeleted) return 'deleted'
-  if (input.isWatchUnavailable) return 'unavailable'
+  if (input.hasNotice) return 'notice'
   if (input.isStale) return 'stale'
   return null
-}
-
-/**
- * Visible banner text for a variant.
- *
- * @param variant - Variant from {@link getBannerVariant}
- * @param reason - Why the watch is unavailable, when it is
- * @returns The sentence to render inside the banner
- *
- * @example
- * ```ts
- * getBannerMessage('unavailable', 'limit')
- * // 'Auto-refresh is unavailable – Erfana is watching its maximum of 100 files. …'
- * ```
- */
-export function getBannerMessage(
-  variant: ViewerBannerVariant,
-  reason: WatchUnavailableReason | null
-): string {
-  switch (variant) {
-    case 'deleted':
-      return VIEWER_BANNER_COPY.deleted
-    case 'stale':
-      return VIEWER_BANNER_COPY.stale
-    default:
-      // An unattributed refusal is reported as a watcher fault, never as the
-      // cap: telling a user to close tabs they do not have wastes their time.
-      return reason === 'limit'
-        ? VIEWER_BANNER_COPY.unavailableLimit
-        : VIEWER_BANNER_COPY.unavailableWatcherError
-  }
 }
 
 /**
@@ -340,15 +272,15 @@ export function getBannerMessage(
  * getViewerStatus({ ...idle, isReloading: true })                              // 'reloading'
  * getViewerStatus({ ...idle, isWatchUnavailable: true })                       // 'unavailable'
  * getViewerStatus({ ...idle, isWatchUnavailable: true,
- *                  bannerVariant: 'unavailable' })                             // 'idle'
+ *                  bannerVariant: 'notice' })                                  // 'idle'
  * getViewerStatus({ ...idle, reloadFailure: 'missing' })                       // 'reload-failed-missing'
  * ```
  */
 export function getViewerStatus(input: ViewerStatusInput): ViewerStatus {
   if (input.reloadFailure === 'missing') return 'reload-failed-missing'
   if (input.reloadFailure === 'watch') return 'reload-failed-watch'
-  if (input.isWatchUnavailable && input.bannerVariant !== 'unavailable') return 'unavailable'
-  if (input.isStale && input.bannerVariant !== 'stale') return 'stale'
+  if (input.isWatchUnavailable && input.bannerVariant !== 'notice') return 'unavailable'
+  if (input.isStale && input.bannerVariant === null) return 'stale'
   if (input.isReloading) return 'reloading'
   return 'idle'
 }

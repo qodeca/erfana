@@ -50,7 +50,8 @@ import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 const DELETE_BUDGET_MS = 15_000
 /** The issue's acceptance budget for a returned file to show in its tab. */
 const RECOVER_BUDGET_MS = 10_000
-const DELETED_BANNER = 'This file was deleted on disk. Save to restore it.'
+/** The editor's deleted notice (#478 § 3.6: "… was deleted, renamed or moved on disk.", with Restore file and Close tab). */
+const DELETED_NOTICE = 'freshness-notice-deleted'
 /** Longer than the 2 s autosave delay after the last keystroke, with room for a slow write. */
 const AUTOSAVE_WATCH_MS = 5_000
 
@@ -113,13 +114,13 @@ test.describe('Editor tab whose file is deleted and comes back', () => {
     await rm(staysGone)
     await expect(returnsDeleted).toBeVisible({ timeout: DELETE_BUDGET_MS })
     await expect(staysGoneDeleted).toBeVisible({ timeout: DELETE_BUDGET_MS })
-    await expect(page.getByText(DELETED_BANNER)).toBeVisible()
+    await expect(page.getByTestId(DELETED_NOTICE)).toBeVisible()
 
     // One comes back, with the other branch's content
     await writeFile(returns, '# Returns\n\nFrom the other branch.\n')
 
     await expect(returnsDeleted).toHaveCount(0, { timeout: RECOVER_BUDGET_MS })
-    await expect(page.getByText(DELETED_BANNER)).toHaveCount(0)
+    await expect(page.getByTestId(DELETED_NOTICE)).toHaveCount(0)
     await expect.poll(async () => monaco.visibleText(), { timeout: RECOVER_BUDGET_MS }).toContain('From the other branch.')
     await expect(tabs.dirtyDot('returns.md')).toHaveCount(0)
 
@@ -171,7 +172,7 @@ test.describe('Editor tab typed in while its file is gone', () => {
 
     await expect(panel.conflictNotification()).toBeVisible({ timeout: RECOVER_BUDGET_MS })
     await expect(deletedMarker).toHaveCount(0)
-    await expect(page.getByText(DELETED_BANNER)).toHaveCount(0)
+    await expect(page.getByTestId(DELETED_NOTICE)).toHaveCount(0)
     // Nothing was overwritten in either direction
     expect(await monaco.visibleText()).toContain('TYPED-WHILE-GONE')
     expect(await monaco.visibleText()).not.toContain('From the other branch.')
@@ -214,7 +215,7 @@ test.describe('Editor tab whose file is deleted and written back at once', () =>
     await expect(tabs.tab('quick.md').locator('.editor-tab-deleted')).toHaveCount(0, {
       timeout: RECOVER_BUDGET_MS
     })
-    await expect(page.getByText(DELETED_BANNER)).toHaveCount(0)
+    await expect(page.getByTestId(DELETED_NOTICE)).toHaveCount(0)
     await expect(tabs.dirtyDot('quick.md')).toHaveCount(0)
     await expect(panel.conflictNotification()).toHaveCount(0)
   })
@@ -322,14 +323,14 @@ test.describe('Editor tab typed in while its file is deleted (#460)', () => {
 
     // Longer than the autosave delay: the file must not come back
     await expect.poll(watchStaysGone(typed), { timeout: AUTOSAVE_WATCH_MS + 5_000 }).toBe('stayed-gone')
-    await expect(page.getByText(DELETED_BANNER)).toBeVisible()
+    await expect(page.getByTestId(DELETED_NOTICE)).toBeVisible()
 
     // The user's own save restores it, with the typed text
     await monaco.focus()
     await keyboard.save()
     await expect.poll(async () => (await exists(typed)) ? readFile(typed, 'utf-8') : '', { timeout: RECOVER_BUDGET_MS })
       .toContain('Typed while deleted.')
-    await expect(page.getByText(DELETED_BANNER)).toHaveCount(0, { timeout: RECOVER_BUDGET_MS })
+    await expect(page.getByTestId(DELETED_NOTICE)).toHaveCount(0, { timeout: RECOVER_BUDGET_MS })
   })
 
   test('a file that comes back offers the changed-on-disk choice and keeps the typed text', async ({

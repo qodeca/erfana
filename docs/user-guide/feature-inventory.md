@@ -72,7 +72,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-10 | Folder right-click menu (**Cut**, **Copy**, **Paste**, **New File**, **New Folder**, **Rename**, **Import...**, **Delete**, **Reveal in Finder** or its platform equivalent) | all | ProjectTree/context-menu/strategies.tsx, commands.tsx | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-11 | File right-click menu; HTML files add Open as source, Open in default browser | all | same | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-12 | Reveal in Finder / Reveal in Explorer | all (label per OS) | commands.tsx | [reference/project-tree](./reference/project-tree.md#file-actions) |
-| TREE-13 | Delete confirmation ("cannot be undone") | all | commands.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
+| TREE-13 | Delete moves the item to the Recycle Bin / Trash; a second prompt before a permanent delete when it cannot go there | all | context-menu/treeDelete.ts | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-14 | Keyboard navigation: one Tab stop, arrows, Home/End, Enter, type-ahead, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> (#88) | all | ProjectTree/treeKeyboard.ts | [reference/project-tree](./reference/project-tree.md#keyboard-navigation) |
 | TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
 | TREE-16 | Excluded folders: `files.exclude` in the global and the project settings file (project adds to global); excluded paths are not shown, read or watched; `.erfana` is never excluded; git status unaffected | all | S/ipc/files-exclude-schema.ts, M/utils/excludeMatcher.ts | [reference/settings](./reference/settings.md#excluded-folders) |
@@ -115,7 +115,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | IMG-02 | Info: dimensions, size, format, last updated | all | ImageViewerToolbar.tsx | [reference/image-viewer](./reference/image-viewer.md#supported-formats-and-information) |
 | IMG-03 | Zoom, fit, full screen | all | same | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
 | IMG-04 | Export as PNG, as PDF, copy to clipboard | all | ImageViewerExportControls.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
-| IMG-05 | Live refresh, "Reloaded from disk"; deleted-file banner with Reload; 100-file watch cap | all | ImageViewerPanel.tsx, ImageViewerBanner.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
+| IMG-05 | Live refresh, "Reloaded from disk"; deleted-file banner ("deleted, renamed or moved on disk") with Close tab; 100-file watch cap | all | ImageViewerPanel.tsx, ImageViewerBanner.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
 | IMG-06 | Mouse and keys: wheel, drag, double-click, + = - 0 F arrows Esc | all | imageViewer.logic.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
 | IMG-07 | Image paths selected in the terminal open in the viewer | all | R/components/Panels/TerminalPanel.tsx | [reference/terminal](./reference/terminal.md#file-links-and-dropped-files) |
 

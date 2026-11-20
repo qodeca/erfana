@@ -201,7 +201,11 @@ export class PreviewLiveView {
 
   /** Show or hide the native view. The hide is synchronous: see `previewLiveVisibility`. */
   setVisibility(visible: boolean): void {
+    const wasWanted = this.parts.visibility.isWanted()
     this.parts.visibility.set(visible)
+    // Shown again: the page and its files are checked against the disk (#478, S1)
+    this.parts.entryWatch.setVisible(visible)
+    if (visible && !wasWanted) this.parts.watchCoordinator.recheck()
   }
 
   /**

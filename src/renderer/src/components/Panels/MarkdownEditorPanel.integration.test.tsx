@@ -313,7 +313,7 @@ describe('MarkdownEditorPanel Integration', () => {
     ).replace(/\r\n/g, '\n')
     const handleSave = source.slice(
       source.indexOf('const handleSave = useCallback'),
-      source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
+      source.indexOf('}, [currentFile, isFileDeleted, watch')
     )
 
     it('useEditorSaveRegistration hook is imported correctly', async () => {
@@ -325,7 +325,7 @@ describe('MarkdownEditorPanel Integration', () => {
       const calls = source.match(/useEditorSaveRegistration\(/g) ?? []
       expect(calls).toHaveLength(1)
       expect(source).toContain(
-        "useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected, () => {\n" +
+        "useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected || isReadOnlyBlocked, () => {\n" +
           '    // A hold stops autosave for real (no re-arming by typing or the modified\n' +
           '    // effect) and makes the editor read-only, so nothing new can be typed\n' +
           '    // between a flush and the end of the hold.\n' +
@@ -336,23 +336,23 @@ describe('MarkdownEditorPanel Integration', () => {
       expect(source.indexOf('useEditorSaveRegistration(panelId,')).toBeGreaterThan(source.indexOf('= useAutoSave('))
     })
 
-    it('handleSave answers true after a write and false with no file or a failed write', () => {
+    it('handleSave answers true after a write and false with no file, blocked content or a failed write', () => {
       expect(handleSave).toContain("async (trigger: SaveTrigger = 'user'): Promise<boolean> =>")
-      expect(handleSave).toContain('if (!currentFile) return false')
+      expect(handleSave).toContain('if (!currentFile || isReadOnlyBlocked) return false')
       expect(handleSave.match(/return true/g)).toHaveLength(1)
       expect(handleSave).toMatch(/catch \(error\) \{[\s\S]*return false\s*\} finally/)
     })
 
-    it('keeps the autosave guard order unchanged', () => {
+    it('keeps the save order unchanged', () => {
+      // Pause, write, adopt-or-conflict, resume and check are the save
+      // add-on's (#478, saveAddOn.test.ts); the panel's own order is this
       const order = [
-        'markSaving()',
-        'pauseWatch()',
+        'trackSaveInFlight(saveInFlightRef)',
         'getValue()',
-        'writeFile(',
-        'notifySaveComplete(contentToSave)',
+        'await watch.save(',
+        "reply.status === 'changed-on-disk'",
         'settleSavedFile(prev, contentToSave, bufferNow)',
-        'resumeWatch()',
-        'unmarkSaving()'
+        'finishInFlight()'
       ].map((step) => handleSave.indexOf(step))
 
       expect(order.every((index) => index >= 0)).toBe(true)
@@ -370,7 +370,7 @@ describe('MarkdownEditorPanel Integration', () => {
     ).replace(/\r\n/g, '\n')
     const handleSave = source.slice(
       source.indexOf('const handleSave = useCallback'),
-      source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
+      source.indexOf('}, [currentFile, isFileDeleted, watch')
     )
     const catchBlock = handleSave.slice(handleSave.indexOf('} catch (error) {'), handleSave.indexOf('} finally {'))
 
@@ -403,33 +403,44 @@ describe('MarkdownEditorPanel Integration', () => {
       // a ref that a layout effect keeps on the latest handleSave
       expect(source).toContain("return handleSaveRef.current('autosave')")
       expect(source).toContain('handleSaveRef.current = handleSave')
-      // an autosave never overwrites a file that changed on disk, and never
-      // brings back a file deleted on disk (#460)
-      const guard = 'if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return'
+      // an autosave never overwrites a file that changed on disk, never brings
+      // back a file deleted on disk (#460), never writes content it cannot show (#478 F1)
+      expect(source).toContain(
+        'const autosaveGate = { conflict: externalChangeDetected, deleted: isFileDeleted, contentBlocked: isReadOnlyBlocked }'
+      )
+      const guard = 'if (!shouldAutosave(autosaveGate)) return'
       expect(source).toContain(guard)
       expect(source.indexOf(guard)).toBeLessThan(
         source.indexOf("return handleSaveRef.current('autosave')")
       )
-      // ...and resumes on its own once the bar or the banner goes away
+      // ...and resumes on its own once the bar, the notice or the block goes away
       expect(source).toContain(
-        'if (shouldAutosave(externalChangeDetected, isFileDeleted)) signalChange()\n' +
-          '  }, [externalChangeDetected, isFileDeleted, signalChange])'
+        'if (shouldAutosave({ conflict: externalChangeDetected, deleted: isFileDeleted, contentBlocked: isReadOnlyBlocked })) signalChange()\n' +
+          '  }, [externalChangeDetected, isFileDeleted, isReadOnlyBlocked, signalChange])'
       )
       expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
-      expect(source.match(/handleSave(?:Ref\.current)?\(/g)).toHaveLength(3)
+      // The deleted notice's Restore file is the tab's own save (F14): it may
+      // recreate the folder, and it is a restore, never a stamp-checked write
+      expect(source).toContain("restore: () => void handleSave('user'),")
+      expect(source.match(/handleSave(?:Ref\.current)?\(/g)).toHaveLength(4)
     })
 
     it('only the tab’s own Cmd+S of a deleted tab may recreate the missing folder', () => {
-      expect(handleSave).toContain('if (shouldRecreateParentDirs(trigger, isFileDeleted)) {')
-      expect(handleSave).toContain('createParentDirs: true,')
+      expect(handleSave).toContain(
+        '...(shouldRecreateParentDirs(trigger, isFileDeleted) ? { createParentDirs: true as const } : {})'
+      )
       expect(handleSave.match(/createParentDirs: true/g)).toHaveLength(1)
+      // ...and a save in the deleted state is a restore: no stamp check (#478 F7)
+      expect(handleSave).toContain('trigger: saveTriggerFor(trigger, isFileDeleted),')
     })
 
     it('names the project the file was opened under on every write', () => {
       expect(handleSave).toContain('const generation = openedGenerationRef.current')
-      const writes = handleSave.match(/await fileGateway\.writeFile\(\{[^}]*\}\)/g) ?? []
-      expect(writes).toHaveLength(2)
-      for (const write of writes) expect(write).toContain('generation')
+      // One write path: the save add-on's checked write (#478), never a bare fileGateway write
+      expect(handleSave.match(/watch\.save\(/g)).toHaveLength(1)
+      expect(handleSave).not.toContain('fileGateway.writeFile(')
+      const write = handleSave.slice(handleSave.indexOf('await watch.save({'), handleSave.indexOf('})\n', handleSave.indexOf('await watch.save({')))
+      expect(write).toContain('generation,')
     })
 
     it('settles a finished save in one update, from the buffer as it is after the write', () => {
@@ -490,9 +501,12 @@ describe('MarkdownEditorPanel Integration', () => {
       expect(source.match(/useLatestFileLoad\(/g)).toHaveLength(1)
       expect(load).toContain('openedGenerationRef.current = generation')
       expect(load).toContain("showToast({ title: 'Could not open file', message, type: 'error'")
-      // no second, unguarded read anywhere in the panel
-      expect(source.match(/fileGateway\.readFile\(/g)).toHaveLength(1)
-      expect(load).toContain('fileGateway.readFile({ filePath })')
+      // no second, unguarded read anywhere in the panel: the classified text
+      // read, whose stamp is the tracker's baseline (#478 G3, C1 limit)
+      expect(source).not.toContain('fileGateway.readFile(')
+      expect(source.match(/readEditorText\(/g)).toHaveLength(1)
+      expect(load).toContain('await readEditorText(filePath)')
+      expect(load).toContain('setBaseline(stamp)')
     })
 
     it('renders the error state with its retry before the empty state', () => {
@@ -509,7 +523,7 @@ describe('MarkdownEditorPanel Integration', () => {
     })
 
     it('keeps one pending indicator reset, cleared when an autosave starts and on unmount', () => {
-      const handleSave = between('const handleSave = useCallback', '}, [currentFile, isFileDeleted, dismissConflict')
+      const handleSave = between('const handleSave = useCallback', '}, [currentFile, isFileDeleted, watch')
       const unmountCleanup = between('// Cleanup: ensure panel is not marked dirty on unmount', '// Debug logging')
       // no fire-and-forget timer is left in the save path
       expect(handleSave).not.toMatch(/\n\s*setTimeout\(/)

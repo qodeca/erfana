@@ -220,10 +220,21 @@
  * from the contrast minimum; for the record, .dialog-btn-primary composited at
  * this opacity over --color-bg-primary measures 2.35:1 with the #161312
  * foreground against 1.62:1 with the old white one, so the change improves the
- * disabled state as well. */
-.dialog-btn:disabled {
+ * disabled state as well. `aria-disabled` is the Buttons card's blocked state:
+ * the same look, still focusable – ConfirmDialog's click guard (#486). */
+.dialog-btn:disabled,
+.dialog-btn[aria-disabled='true'] {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Blocked: no lift and no shadow on hover or press. Same specificity as the
+ * variants' :hover rules and later, so it wins; the background rules stay as
+ * they are (Dialog.contrast.test.ts measures them). */
+.dialog-btn[aria-disabled='true']:hover,
+.dialog-btn[aria-disabled='true']:active {
+  transform: none;
   box-shadow: none;
 }
 

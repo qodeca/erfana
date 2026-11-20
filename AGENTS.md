@@ -32,6 +32,23 @@ changes run `npm run test:e2e` locally.
 commit what it changes. Install with `npm ci`, never
 `npm install` (it rewrites `package-lock.json` in a way CI rejects).
 
+## Checking while you work
+
+The full list above is for the end. While you work, check only what your change can break. A
+scan of eight sessions (November 2026) found the same checks run hundreds of times between edits.
+
+- **Type-check the part you changed** – `npm run typecheck:node` (main, preload, shared),
+  `typecheck:web` (renderer) or `typecheck:test:node` / `:web` / `:e2e` (tests). Run the full
+  `npm run typecheck` once at the end. It ran 244 times in those sessions, 410 minutes.
+- **Run `npm run design -- --check` only when `docs/design-system/`, `docs/designs/` or
+  `design-tokens.css` changed**, and `npm run check:claims` once after a group of edits (run
+  `-- --update` straight after moving anchored lines). They ran 310 and 153 times, 329 minutes.
+- **Build once, then run the e2e specs together.** `npm run build:e2e` once per change set, then
+  one `npx playwright test` call with every spec you need. Do not rebuild when only test files
+  changed. Builds ran 102 times and e2e runs 164 times, 386 minutes.
+- **Ask independent questions together** – up to four in one question box, not one round each.
+  There were 140 rounds of questions, 103 of them in one session.
+
 ## Where things live
 
 - Code: `src/main/` (main process), `src/preload/`, `src/renderer/` (React UI), `src/shared/` (IPC schemas).

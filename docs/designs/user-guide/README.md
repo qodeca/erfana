@@ -224,7 +224,7 @@ which is drawn by a separate Electron view and is not in a normal page screensho
 | 40 | `html-preview/problems.png` | preview-an-html-page, reference/troubleshooting | `site/broken.html`: Preview issues list open with a script error | editor panel | | yes |
 | 41 | `html-preview/toolbar.png` | reference/html-preview | Preview toolbar: Back, Open links in this tab, Find, permission chip, Open in default browser, Export to PDF | toolbar | | yes |
 | 42 | `images/image-viewer.png` | view-and-export-images | `images/garden-map.svg` open; toolbar with size, format, zoom, export | editor panel | | |
-| 43 | `images/deleted-file.png` | view-and-export-images | Open image deleted on disk by the script: banner with **Reload**, tab "(deleted)" | editor panel | | |
+| 43 | `images/deleted-file.png` | view-and-export-images | Open image deleted on disk by the script: banner "deleted, renamed or moved on disk" with **Close tab**, tab "(deleted)" | editor panel | | |
 | 44 | `send-a-screenshot/capture-buttons.png` | send-a-screenshot-or-photo | Terminal header buttons, tooltip on Capture area | terminal header | | |
 | 45 | `send-a-screenshot/camera-dialog.png` | send-a-screenshot-or-photo | Camera dialog showing Chromium's fake camera test pattern (`--use-fake-device-for-media-stream`), never a real camera | dialog | | |
 | 46 | `several-windows/quit-confirmation.png` | work-in-several-windows | Quit with an unsaved file and a running terminal: quit dialog | dialog | | |

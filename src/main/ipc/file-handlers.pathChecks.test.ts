@@ -31,9 +31,11 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-const { handlers, showItemInFolder, statSpy, realStat } = vi.hoisted(() => ({
+const { handlers, showItemInFolder, trashItem, statSpy, realStat } = vi.hoisted(() => ({
   handlers: {} as Record<string, (...args: any[]) => any>,
   showItemInFolder: vi.fn(),
+  // The project tree's Delete goes to the trash (#486); the mock moves nothing
+  trashItem: vi.fn(async (_path: string) => {}),
   statSpy: vi.fn(),
   realStat: { current: undefined as unknown as (...args: any[]) => Promise<unknown> }
 }))
@@ -51,7 +53,7 @@ vi.mock('electron', () => ({
     }
   },
   dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn() },
-  shell: { showItemInFolder }
+  shell: { showItemInFolder, trashItem }
 }))
 
 vi.mock('electron-store', () => {
@@ -109,8 +111,8 @@ const REQUEST_FIELDS: Readonly<Record<string, readonly string[]>> = {
   'file:exists': ['filePath'],
   'file:createFile': ['dirPath', 'name'],
   'file:createFolder': ['dirPath', 'name'],
-  'file:deleteFile': ['filePath'],
-  'file:deleteFolder': ['filePath'],
+  'file:deleteFile': ['filePath', 'permanent'],
+  'file:deleteFolder': ['filePath', 'permanent'],
   'file:rename': ['oldPath', 'newName'],
   'file:moveItem': ['sourcePath', 'targetParentPath', 'newName', 'replaceExisting'],
   'file:copyItem': ['sourcePath', 'targetParentPath', 'newName'],
@@ -177,6 +179,7 @@ describe('file:* path checks', () => {
     statSpy.mockReset()
     statSpy.mockImplementation((...args: any[]) => realStat.current(...args))
     showItemInFolder.mockClear()
+    trashItem.mockClear()
     base = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'erfana-path-checks-')))
     root = path.join(base, 'proj')
     outside = path.join(base, 'outside')
@@ -223,13 +226,18 @@ describe('file:* path checks', () => {
     })
 
     it('every confined channel registered by production code checks the real file system', async () => {
-      // The Markdown image channel takes an injectable seam for its tests; the
-      // production registration must not use it
+      // The Markdown image and file-watch channels take an injectable seam for
+      // their tests; the production registrations must not use it
       const { projectService } = await import('./file-handlers')
       const { registerMarkdownImageHandlers } = await import('./markdown-image-handlers')
+      const { registerFileWatcherHandlers } = await import('./file-watcher-handlers')
       registerMarkdownImageHandlers(projectService.session)
+      registerFileWatcherHandlers(projectService.session)
       const deps = getConfinedChannelDeps()
       expect(deps.has('markdown-image:read')).toBe(true)
+      for (const channel of ['subscribe', 'probe', 'readText', 'writeText']) {
+        expect(deps.has(`file-watch:${channel}`), channel).toBe(true)
+      }
       for (const [channel, used] of deps) {
         expect(used, channel).toBe(defaultConfinementDeps)
       }
@@ -566,11 +574,16 @@ describe('file:* path checks', () => {
       async () => {
         await invoke('file:rename', path.join(root, 'link.md'), 'renamed-link.md')
         expect(lstatSync(path.join(root, 'renamed-link.md')).isSymbolicLink()).toBe(true)
+        // To the trash: the link's own path is handed over, never its target
         await invoke('file:deleteFile', path.join(root, 'renamed-link.md'))
+        expect(trashItem).toHaveBeenLastCalledWith(path.join(root, 'renamed-link.md'))
+        await invoke('file:deleteFile', path.join(root, 'renamed-link.md'), true)
         expect(existsSync(path.join(root, 'renamed-link.md'))).toBe(false)
         expect(readFileSync(path.join(outside, 'secret.txt'), 'utf8')).toBe('secret')
 
         await invoke('file:deleteFolder', path.join(root, 'dirlink'))
+        expect(trashItem).toHaveBeenLastCalledWith(path.join(root, 'dirlink'))
+        await invoke('file:deleteFolder', path.join(root, 'dirlink'), true)
         expect(existsSync(path.join(root, 'dirlink'))).toBe(false)
         expect(readdirSync(path.join(outside, 'folder'))).toEqual(['keep.txt'])
       }

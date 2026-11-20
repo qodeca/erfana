@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { AtomicSaveDetector } from './AtomicSaveDetector'
+import { AtomicSaveDetector, createAtomicSaveDetector } from './AtomicSaveDetector'
 import { UNREADABLE_RECHECK_MS } from './pathPresence'
 import * as fs from 'fs'
 import * as fsPromises from 'fs/promises'
@@ -323,5 +323,81 @@ describe('AtomicSaveDetector', () => {
       expect(fresh).toHaveBeenCalledWith('/test/file.txt', true)
       expect(detector.getPendingCount()).toBe(0)
     })
+  })
+})
+
+// #478 plan decision 26: the watch layer's detector looks for the file at once
+// and waits the window only when the file is not there yet
+describe('AtomicSaveDetector – look at once (createAtomicSaveDetector)', () => {
+  let detector: AtomicSaveDetector
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    detector = createAtomicSaveDetector()
+  })
+
+  afterEach(() => {
+    detector.dispose()
+    restorePlatform()
+    vi.useRealTimers()
+  })
+
+  it('reports an atomic save without waiting the window when the file is already back', async () => {
+    const callback = vi.fn()
+    vi.mocked(fsPromises.stat).mockResolvedValue({} as never)
+
+    detector.registerDelete('/test/file.txt', callback)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(callback).toHaveBeenCalledWith('/test/file.txt', true)
+    expect(detector.getPendingCount()).toBe(0)
+  })
+
+  it('waits the window when the file is not there yet, then decides', async () => {
+    const callback = vi.fn()
+    vi.mocked(fsPromises.stat).mockRejectedValueOnce(errno('ENOENT')).mockResolvedValue({} as never)
+
+    detector.registerDelete('/test/file.txt', callback)
+    await vi.advanceTimersByTimeAsync(50)
+    expect(callback).not.toHaveBeenCalled()
+    expect(detector.hasPending('/test/file.txt')).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(60)
+    expect(callback).toHaveBeenCalledWith('/test/file.txt', true)
+  })
+
+  it('reports a delete after the window when the file stays gone', async () => {
+    const callback = vi.fn()
+    vi.mocked(fsPromises.stat).mockRejectedValue(errno('ENOENT'))
+
+    detector.registerDelete('/test/file.txt', callback)
+    await vi.advanceTimersByTimeAsync(110)
+
+    expect(callback).toHaveBeenCalledWith('/test/file.txt', false)
+  })
+
+  it('waits the window, with its second look, for a Windows file that may be being deleted', async () => {
+    stubPlatform('win32')
+    const callback = vi.fn()
+    vi.mocked(fsPromises.stat).mockRejectedValue(errno('EPERM'))
+
+    detector.registerDelete('/test/file.txt', callback)
+    await vi.advanceTimersByTimeAsync(110)
+    expect(callback).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(UNREADABLE_RECHECK_MS)
+
+    expect(callback).toHaveBeenCalledWith('/test/file.txt', false)
+  })
+
+  it('reports nothing when cancelled while the at-once look runs', async () => {
+    const callback = vi.fn()
+    vi.mocked(fsPromises.stat).mockResolvedValue({} as never)
+
+    detector.registerDelete('/test/file.txt', callback)
+    detector.cancelPending('/test/file.txt')
+    await vi.advanceTimersByTimeAsync(110)
+
+    expect(callback).not.toHaveBeenCalled()
   })
 })

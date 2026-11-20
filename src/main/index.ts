@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { app, BrowserWindow, Menu, dialog, session } from 'electron'
+import { app, BrowserWindow, Menu, dialog, session, powerMonitor } from 'electron'
 import { join } from 'path'
 import { APP_ID } from '../shared/constants'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,6 +8,8 @@ import { spawnNewInstance } from './utils/spawnNewInstance'
 import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
 import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
+import { wirePowerResume, wireWatchOwner } from './services/freshness/watchOwnerLifecycle'
+import { wireProjectOwner } from './services/project/projectOwnerLifecycle'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
@@ -300,9 +302,8 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  // Cleanup services when webContents is destroyed (window close or dev refresh - issue #59)
-  // This prevents stale watchers and terminal processes from accumulating
-  // CRITICAL: Must also clear project state so new window can re-open the same project
+  // Cleanup services when webContents is destroyed (window close - issue #59). A reload keeps the
+  // webContents: the did-navigate hooks below end its file watches and its open project (#485)
   const webContentsId = mainWindow.webContents.id
 
   // Previews and browser tabs belong to a WINDOW, so they are reaped when the window
@@ -323,25 +324,20 @@ function createWindow(): BrowserWindow {
   mainWindow.on('will-resize', () => previewHandlers?.setResizeHold(previewWindowId, true))
   mainWindow.on('resized', () => previewHandlers?.setResizeHold(previewWindowId, false))
 
+  // File watches end with the page that holds them: on a navigation or reload, and on destroy (#478 G2)
+  wireWatchOwner(mainWindow.webContents, fileWatcherService)
+  // So does the open project, or reopening it after a reload is a no-op with an empty tree (#485)
+  wireProjectOwner(mainWindow.webContents, projectService)
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
-    // CRITICAL FIX (issue #59): Close the project, which clears the session and
-    // the services that follow it. Without this, the same-project check returns
-    // true and does 'noop' when the user clicks the same project in a new
-    // window, causing an empty file tree. The lock is released too.
+    // Issue #59: close the project (session, its services, the lock). Otherwise the same-project
+    // check makes reopening it in a new window a 'noop', leaving an empty file tree.
     projectService
       .close({ senderId: webContentsId, reason: 'window-destroyed' })
       .catch((err) => {
         logger.error('Error closing project', redactedLogError(err))
       })
-
-    // Cleanup watcher services asynchronously
-    // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
-    // Errors are logged but don't halt further cleanup operations
-    fileWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
-      logger.error('Error cleaning up file watchers', err instanceof Error ? err : undefined)
-    })
 
     directoryWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
       logger.error('Error cleaning up directory watchers', err instanceof Error ? err : undefined)
@@ -500,6 +496,8 @@ app.whenReady().then(async () => {
       .catch((error: unknown) => logger.error('Re-checking open files failed', redactedLogError(error)))
   })
   fileWatcherService.watchUnseenFiles(directoryWatcherService)
+  // A watcher can die silently in sleep: re-arm every watch on wake (#478 G8)
+  wirePowerResume(powerMonitor, fileWatcherService)
 
   // Register IPC handlers. Every global channel is gated on the app's own
   // top-level renderer by construction: the handlers register through
@@ -507,7 +505,7 @@ app.whenReady().then(async () => {
   // imported anywhere else (sd-074b §7). There is no install step to forget and
   // no ordering to get wrong.
   registerFileHandlers()
-  registerFileWatcherHandlers()
+  registerFileWatcherHandlers(projectService.session)
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
   registerTerminalHandlers(projectService.session)

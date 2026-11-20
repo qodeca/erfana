@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { WATCH_BUCKETS } from './freshness/timingProfiles'
 import { MODEL_PINS } from './whisper-model-pins'
 
 /**
@@ -546,23 +547,16 @@ export const PREVIEW = {
    */
   MIN_ZOOM_LEVEL: -5,
   MAX_ZOOM_LEVEL: 5,
-  /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
-  MAX_WATCHED_FILES: 16,
+  /** Per-panel watch cap (bounds EMFILE exposure, #146–#151); the `preview` watch bucket (#478) */
+  MAX_WATCHED_FILES: WATCH_BUCKETS.preview.perOwnerCap,
   /**
-   * Ceiling on watch acquisitions across ALL previews. Derived from
-   * `MAX_LIVE_VIEWS × MAX_WATCHED_FILES` plus headroom for a view that is mid
-   * teardown while another opens — pools are per view, so this counts
-   * acquisitions rather than distinct descriptors. Over budget degrades
-   * auto-refresh for the newest view and records a failure entry; it never
-   * silently stops watching (sd-074b §4.6).
+   * Ceiling on watch acquisitions across ALL previews: `MAX_LIVE_VIEWS ×
+   * MAX_WATCHED_FILES` plus headroom for a view mid teardown while another
+   * opens (pools are per view, so it counts acquisitions, not descriptors).
+   * Over budget degrades auto-refresh for the newest view and records a
+   * failure entry; it never silently stops watching (sd-074b §4.6).
    */
-  MAX_WATCHED_FILES_GLOBAL: 64,
-  /** Coalesce window for pool change events before a reload/swap (ms) */
-  WATCH_COALESCE_MS: 30,
-  /** chokidar awaitWriteFinish.stabilityThreshold for preview watches (ms) */
-  WATCH_STABILITY_MS: 50,
-  /** chokidar awaitWriteFinish.pollInterval for preview watches (ms) */
-  WATCH_POLL_INTERVAL_MS: 25,
+  MAX_WATCHED_FILES_GLOBAL: WATCH_BUCKETS.preview.totalCap,
   /** Failure-log ring-buffer capacity; older entries drop, sets `truncated` */
   MAX_FAILURES: 100,
   /** Failure emission coalescing window with a trailing send (ms) */

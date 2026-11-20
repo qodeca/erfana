@@ -12,7 +12,10 @@ interface FakeEditor {
   dispose: () => void
 }
 
-function fakeEditor(value: string | null): FakeEditor {
+function fakeEditor(
+  value: string | null,
+  view: { scrollTop: number; line: number | null } = { scrollTop: 0, line: 1 }
+): FakeEditor {
   const container = document.createElement('div')
   const dom = document.createElement('div')
   container.appendChild(dom)
@@ -21,6 +24,8 @@ function fakeEditor(value: string | null): FakeEditor {
   const editor = {
     getContainerDomNode: () => dom,
     getModel: () => (value === null ? null : { getValue: () => value }),
+    getScrollTop: () => view.scrollTop,
+    getPosition: () => (view.line === null ? null : { lineNumber: view.line, column: 1 }),
     onDidDispose: (listener: () => void) => {
       onDispose.push(listener)
       return { dispose: () => {} }
@@ -83,6 +88,25 @@ describe('editor test hook', () => {
       const forget = registerTestEditor(e.editor)
 
       expect(window.__erfanaTest!.editorValue(e.container)).toBeNull()
+      forget()
+    })
+
+    it('returns the scroll position and cursor line of the editor inside the container', () => {
+      enable()
+      const e = fakeEditor('a\nb\nc\n', { scrollTop: 340, line: 3 })
+      const forget = registerTestEditor(e.editor)
+
+      expect(window.__erfanaTest!.editorView(e.container)).toEqual({ scrollTop: 340, cursorLine: 3 })
+      expect(window.__erfanaTest!.editorView(document.createElement('div'))).toBeNull()
+      forget()
+    })
+
+    it('returns no view for an editor with no cursor', () => {
+      enable()
+      const e = fakeEditor('x', { scrollTop: 0, line: null })
+      const forget = registerTestEditor(e.editor)
+
+      expect(window.__erfanaTest!.editorView(e.container)).toBeNull()
       forget()
     })
 

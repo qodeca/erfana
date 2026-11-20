@@ -10,7 +10,7 @@
  * - CutCommand, CopyCommand: Clipboard operations
  * - PasteIntoDirectoryCommand: Paste with conflict checking (file rows: fileRowCommands.ts)
  * - RenameFileCommand, RenameDirectoryCommand: Rename with duplicate detection
- * - DeleteFileCommand, DeleteDirectoryCommand: Delete with confirmation
+ * - DeleteFileCommand, DeleteDirectoryCommand: in deleteCommands.ts (Recycle Bin / Trash)
  * - NewFileInDirectoryCommand, NewFolderInDirectoryCommand: Create operations
  *
  * All commands are testable via dependency injection (MenuContext).
@@ -27,7 +27,7 @@ import { clipboardIcon, clipboardShortcut } from '../../ContextMenu/clipboardMen
  * Base class for all commands
  * Provides toMenuItem() conversion and common structure
  */
-abstract class CommandBase {
+export abstract class CommandBase {
   abstract label: string
   icon?: ReactNode
   danger?: boolean
@@ -281,71 +281,6 @@ export class RenameFileCommand extends RenameCommandBase<FileNodeFile> {
 export class RenameDirectoryCommand extends RenameCommandBase<FileNodeDirectory> {
   label = 'Rename'
   protected itemType = 'directory' as const
-}
-
-/* ========== Delete Commands ========== */
-
-/**
- * Base class for delete commands
- * Handles confirmation dialog and deletion
- */
-abstract class DeleteCommandBase<T extends FileNodeFile | FileNodeDirectory> extends CommandBase {
-  danger = true
-  icon = clipboardIcon('delete')
-  shortcut = clipboardShortcut('delete', 'item')
-  protected abstract confirmTitle: string
-  protected abstract confirmMessage(name: string): string
-  protected abstract doDelete(node: T): Promise<void>
-
-  async execute(): Promise<void> {
-    const node = this.node as T
-    const confirmed = await this.ctx.dialogs.showConfirm({
-      title: this.confirmTitle,
-      message: this.confirmMessage(node.name),
-      confirmLabel: 'Delete',
-      danger: true
-    })
-    if (!confirmed) return
-
-    try {
-      await this.ctx.withWatcherPause(async () => {
-        await this.doDelete(node)
-        await this.ctx.refreshProjectTree()
-      })
-      this.ctx.onGitRefresh?.()
-    } catch (err) {
-      const msg = this.ctx.formatFileOperationError(err, 'delete')
-      this.ctx.toast({ type: 'error', title: 'Error', message: msg })
-    }
-  }
-}
-
-/**
- * Delete file command
- */
-export class DeleteFileCommand extends DeleteCommandBase<FileNodeFile> {
-  label = 'Delete'
-  protected confirmTitle = 'Delete File'
-  protected confirmMessage = (name: string) =>
-    `Are you sure you want to delete "${name}"? This action cannot be undone.`
-
-  protected async doDelete(node: FileNodeFile): Promise<void> {
-    await this.ctx.api.deleteFile({ filePath: node.path })
-  }
-}
-
-/**
- * Delete directory command
- */
-export class DeleteDirectoryCommand extends DeleteCommandBase<FileNodeDirectory> {
-  label = 'Delete'
-  protected confirmTitle = 'Delete Folder'
-  protected confirmMessage = (name: string) =>
-    `Are you sure you want to delete "${name}" and all its contents? This action cannot be undone.`
-
-  protected async doDelete(node: FileNodeDirectory): Promise<void> {
-    await this.ctx.api.deleteFolder({ filePath: node.path })
-  }
 }
 
 /* ========== Create Commands ========== */

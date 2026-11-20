@@ -62,10 +62,7 @@ vi.mock('../services/FileService', () => ({
 }))
 
 vi.mock('../services/FileWatcherService', () => ({
-  fileWatcherService: {
-    stopAll: vi.fn(),
-    setProjectPath: vi.fn()
-  }
+  fileWatcherService: { bindSession: vi.fn(), suspendAll: vi.fn(async () => {}), resumeSuspended: vi.fn(async () => {}), endSuspended: vi.fn(async () => {}) }
 }))
 
 vi.mock('../services/DirectoryWatcherService', () => ({

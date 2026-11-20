@@ -8,7 +8,7 @@
  * single-file watch hears nothing when a folder above the file goes away.
  * `watchUnseenFiles` re-checks such files on a timer; `checkWatchedFilesUnder`
  * re-checks the files under a folder whose removals a pause lost. Both only
- * ever look at this session's files inside the project.
+ * ever look at the live watches inside the open project.
  *
  * Real files in `os.tmpdir()`. The rename case uses the real chokidar watch;
  * the others seed watch entries with fake watchers, so no file handle is held
@@ -20,8 +20,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
-import type { WebContents } from 'electron'
-import { SubscriberCounter } from './watcher/SubscriberCounter'
+import { pathKey } from '../utils/pathCompare'
+import type { WatchEntry } from './watcher/watchTypes'
 
 const sends = vi.hoisted(() => [] as Array<{ channel: string; payload: Record<string, unknown> }>)
 
@@ -40,18 +40,17 @@ vi.mock('electron', () => ({
 }))
 
 import { FileWatcherService } from './FileWatcherService'
+import { testSession } from './watcher/__test__/testSession'
+import { WindowWatches } from './watcher/__test__/windowWatches'
 import { MISSING_ROUNDS_TO_REPORT, UNSEEN_PROBE_INTERVAL_MS, type RemovalCoverage } from './watcher/unseenWatchProbe'
 
 /** Two probe rounds, the 100 ms atomic-save window and the existence re-check, with CI headroom. */
 const EVENT_BUDGET_MS = UNSEEN_PROBE_INTERVAL_MS * MISSING_ROUNDS_TO_REPORT + 6_000
 /** A test that waits on real probe rounds needs more than vitest's 5 s default. */
 const REAL_ROUNDS_TEST_MS = EVENT_BUDGET_MS + 3_000
-const webContents = { id: 1 } as unknown as WebContents
 
 interface ServiceInternals {
-  watchedFiles: Map<string, unknown>
-  switchVersion: number
-  handleFileDeleted: (filePath: string) => void
+  handleFileDeleted: (entry: WatchEntry) => void
 }
 
 interface FakeCoverage extends RemovalCoverage {
@@ -80,6 +79,7 @@ function fakeCoverage(covered: (filePath: string) => boolean): FakeCoverage {
 describe('FileWatcherService – files the project watcher cannot see (#252)', () => {
   let root: string
   let svc: FileWatcherService
+  let w: WindowWatches
 
   beforeEach(async () => {
     sends.length = 0
@@ -89,8 +89,8 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
     await writeFile(join(root, '.github', 'workflows', 'ci.yml'), 'name: ci')
     await writeFile(join(root, 'docs', 'open.md'), '# open')
     await writeFile(join(root, 'docs', 'kept.md'), '# kept')
-    svc = new FileWatcherService()
-    svc.setProjectPath(root)
+    svc = new FileWatcherService({ session: testSession(root) })
+    w = new WindowWatches(svc, sends)
   })
 
   afterEach(async () => {
@@ -100,20 +100,28 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
   })
 
   const internals = (): ServiceInternals => svc as unknown as ServiceInternals
-  const deleted = (): string[] =>
-    sends.filter(s => s.channel === 'file-watch:deleted').map(s => String(s.payload.filePath))
+  const deleted = (): string[] => w.filesWith('deleted')
 
   /** A watch entry with a fake watcher: no handle, no event of its own. */
-  function seedWatch(filePath: string, version = internals().switchVersion): void {
-    internals().watchedFiles.set(filePath, {
+  function seedWatch(filePath: string, suspended = false, into: FileWatcherService = svc): WatchEntry {
+    const entry = {
+      key: pathKey(filePath, true),
       filePath,
+      profile: 'editor',
       watcher: { close: vi.fn(async () => {}) },
-      subscribers: SubscriberCounter.from([webContents.id]),
-      isPaused: false,
-      debounceTimer: null,
-      version
-    })
+      suspended,
+      identity: null,
+      arming: null,
+      ready: null,
+      subs: new Set<string>()
+    } as unknown as WatchEntry
+    into.entries.set(entry.key, entry)
+    return entry
   }
+
+  /** The files the unlink branch was handed, in order. */
+  const deletedEntries = (spy: { mock: { calls: Array<[WatchEntry]> } }): string[] =>
+    spy.mock.calls.map(([entry]) => entry.filePath)
 
   // Windows refuses to rename a folder while a watch holds a handle inside it (EPERM),
   // so this real-fs rename needs a POSIX host.
@@ -122,7 +130,7 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
     async () => {
       const ci = join(root, '.github', 'workflows', 'ci.yml')
       svc.watchUnseenFiles(fakeCoverage(() => false))
-      await svc.watchFile(ci, webContents)
+      await w.started(ci)
 
       await rename(join(root, '.github'), join(root, '.github2'))
 
@@ -144,10 +152,10 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
 
       svc.watchUnseenFiles(fakeCoverage(filePath => filePath === covered))
 
-      await vi.waitFor(() => expect(handleFileDeleted).toHaveBeenCalledWith(unseen), {
+      await vi.waitFor(() => expect(deletedEntries(handleFileDeleted)).toContain(unseen), {
         timeout: EVENT_BUDGET_MS
       })
-      expect(handleFileDeleted).not.toHaveBeenCalledWith(covered)
+      expect(deletedEntries(handleFileDeleted)).not.toContain(covered)
     },
     REAL_ROUNDS_TEST_MS
   )
@@ -166,22 +174,22 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
 
     await svc.checkWatchedFilesUnder(join(root, 'docs'), filePath => filePath === own)
 
-    expect(handleFileDeleted.mock.calls).toEqual([[open]])
+    expect(deletedEntries(handleFileDeleted)).toEqual([open])
   })
 
-  it('never checks a file outside the project or from an earlier session', async () => {
+  it('never checks a file outside the project or one suspended for a project switch', async () => {
     const inside = join(root, 'docs', 'gone.md')
     const outside = join(`${root}-sibling`, 'gone.md')
-    const stale = join(root, 'docs', 'stale.md')
+    const suspended = join(root, 'docs', 'suspended.md')
     seedWatch(inside)
     seedWatch(outside)
-    seedWatch(stale, internals().switchVersion - 1)
+    seedWatch(suspended, true)
     const handleFileDeleted = vi.spyOn(internals(), 'handleFileDeleted')
 
     // A root wide enough to hold all three
     await svc.checkWatchedFilesUnder(dirname(root))
 
-    expect(handleFileDeleted.mock.calls).toEqual([[inside]])
+    expect(deletedEntries(handleFileDeleted)).toEqual([inside])
   })
 
   it('checks nothing once disposed', async () => {
@@ -211,14 +219,7 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
   it('arms nothing without a project: the probe never reaches outside one', () => {
     vi.useFakeTimers()
     const noProject = new FileWatcherService()
-    ;(noProject as unknown as ServiceInternals).watchedFiles.set('/anywhere/open.md', {
-      filePath: '/anywhere/open.md',
-      watcher: { close: vi.fn(async () => {}) },
-      subscribers: SubscriberCounter.from([webContents.id]),
-      isPaused: false,
-      debounceTimer: null,
-      version: 0
-    })
+    seedWatch('/anywhere/open.md', false, noProject)
 
     noProject.watchUnseenFiles(fakeCoverage(() => false))
 
@@ -232,11 +233,11 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
     svc.watchUnseenFiles(fakeCoverage(() => false))
     expect(vi.getTimerCount()).toBe(1)
 
-    await svc.stopAll()
+    await svc.suspendAll()
     expect(vi.getTimerCount()).toBe(0)
 
     seedWatch(join(root, 'docs', 'kept.md'))
-    // watchFile tells the probe about a new watch; a seeded one needs a nudge
+    // A subscribe tells the probe about a new watch; a seeded one needs a nudge
     svc.watchUnseenFiles(fakeCoverage(() => false))
     expect(vi.getTimerCount()).toBe(1)
   })
@@ -245,16 +246,18 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
     vi.useFakeTimers()
     seedWatch(join(root, 'docs', 'open.md'))
     // A close that never settles, as on a drive that stopped answering
-    ;(internals().watchedFiles.get(join(root, 'docs', 'open.md')) as { watcher: { close: () => Promise<void> } })
-      .watcher.close = () => new Promise<void>(() => {})
+    const open = svc.entries.get(pathKey(join(root, 'docs', 'open.md'), true)) as unknown as {
+      watcher: { close: () => Promise<void> }
+    }
+    open.watcher.close = () => new Promise<void>(() => {})
     svc.watchUnseenFiles(fakeCoverage(() => false))
     expect(vi.getTimerCount()).toBe(1)
 
-    void svc.stopAll()
+    void svc.suspendAll()
 
     expect(vi.getTimerCount()).toBe(0)
     // Let dispose in afterEach skip the close that never settles
-    internals().watchedFiles.clear()
+    svc.entries.clear()
   })
 
   it('stops for good on dispose and lets go of the coverage', async () => {

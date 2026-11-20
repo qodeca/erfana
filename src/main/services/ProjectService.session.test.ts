@@ -81,8 +81,10 @@ describe('ProjectService – main-owned project session', () => {
       setPathFilter: vi.fn()
     } as any
     fileWatcherService = {
-      setProjectPath: vi.fn(),
-      stopAll: vi.fn(() => Promise.resolve())
+      bindSession: vi.fn(),
+      suspendAll: vi.fn(() => Promise.resolve()),
+      resumeSuspended: vi.fn(() => Promise.resolve()),
+      endSuspended: vi.fn(() => Promise.resolve())
     } as any
     directoryWatcherService = {
       setProjectPath: vi.fn(),
@@ -335,9 +337,11 @@ describe('ProjectService – main-owned project session', () => {
       await service.switchProject(PROJECT_A)
       await service.close({ senderId: null, reason: 'window-destroyed' })
 
-      for (const target of [fileService, fileWatcherService, directoryWatcherService]) {
+      for (const target of [fileService, directoryWatcherService]) {
         expect(vi.mocked(target.setProjectPath).mock.calls.map(([p]) => p)).toEqual([PROJECT_A, ''])
       }
+      // The file watcher reads the session itself (#478, decision 13)
+      expect(fileWatcherService.bindSession).toHaveBeenCalledWith(service.session)
     })
 
     it('stops notifying a listener once it unsubscribes, and survives one that throws', async () => {
@@ -375,7 +379,9 @@ describe('ProjectService – main-owned project session', () => {
       await service.close({ senderId: 1, reason: 'user' })
 
       expect(lockService.releaseLock).toHaveBeenCalledWith(PROJECT_A)
-      expect(fileWatcherService.stopAll).toHaveBeenCalledTimes(2)
+      // Suspended at the open and at the close; the close ends them as project-closed
+      expect(fileWatcherService.suspendAll).toHaveBeenCalledTimes(2)
+      expect(fileWatcherService.endSuspended).toHaveBeenLastCalledWith(2, 'project-closed')
       expect(settingsService.clearLastProjectPath).toHaveBeenCalledTimes(1)
       expect(service.session.current()).toBeNull()
     })
@@ -405,6 +411,58 @@ describe('ProjectService – main-owned project session', () => {
       expect(result.action).toBe('switched')
     })
   })
+  describe('close after the owning page reloaded (#485)', () => {
+    it('lets the reloaded page open the same project again and keeps the last path', async () => {
+      await service.switchProject(PROJECT_A, { senderId: 5, source: 'dialog' })
+      const generation = service.session.current()!.generation
+      await service.close({ senderId: 5, reason: 'page-reloaded', expectedGeneration: generation })
+      mockSend.mockClear()
+
+      const result = await service.switchProject(PROJECT_A, { senderId: 5, source: 'recent' })
+
+      expect(result.action).toBe('switched')
+      expect(mockSend).toHaveBeenCalledWith(
+        'project:changed',
+        expect.objectContaining({ oldPath: null, newPath: PROJECT_A })
+      )
+      expect(settingsService.clearLastProjectPath).not.toHaveBeenCalled()
+    })
+
+    it('broadcasts the close with no new path', async () => {
+      await service.switchProject(PROJECT_A, { senderId: 5, source: 'dialog' })
+      mockSend.mockClear()
+
+      await service.close({ senderId: 5, reason: 'page-reloaded' })
+
+      expect(mockSend).toHaveBeenCalledWith(
+        'project:changed',
+        expect.objectContaining({ oldPath: PROJECT_A, newPath: null })
+      )
+    })
+
+    it('leaves alone a project opened after the reload (stale generation)', async () => {
+      await service.switchProject(PROJECT_A, { senderId: 5, source: 'dialog' })
+      const atReload = service.session.current()!.generation
+      await service.switchProject(PROJECT_B, { senderId: 5, source: 'dialog' })
+      vi.mocked(lockService.releaseLock).mockClear()
+
+      await service.close({ senderId: 5, reason: 'page-reloaded', expectedGeneration: atReload })
+
+      expect(service.session.current()?.root).toBe(PROJECT_B)
+      expect(lockService.releaseLock).not.toHaveBeenCalled()
+    })
+
+    it('is ignored when another window reloads', async () => {
+      await service.switchProject(PROJECT_A, { senderId: 5, source: 'dialog' })
+      vi.mocked(lockService.releaseLock).mockClear()
+
+      await service.close({ senderId: 9, reason: 'page-reloaded' })
+
+      expect(service.session.current()?.root).toBe(PROJECT_A)
+      expect(lockService.releaseLock).not.toHaveBeenCalled()
+    })
+  })
+
   describe('a transition that throws', () => {
     it('does not poison the queue for the next one', async () => {
       vi.mocked(validatePath).mockRejectedValueOnce(new Error('disk exploded'))

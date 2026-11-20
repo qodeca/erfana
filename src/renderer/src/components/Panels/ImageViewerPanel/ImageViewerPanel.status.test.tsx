@@ -19,8 +19,15 @@ import { screen, fireEvent, waitFor } from '@testing-library/react'
 
 import { TEST_IDS } from '../../../constants/testids'
 import { INDICATOR_DURATION_MS } from '../../../constants/fileWatch'
-import { VIEWER_BANNER_COPY, VIEWER_STATUS_COPY } from './imageViewerStatus.logic'
-import { alertsExcludingExportRegion, installImageViewerHarness } from './__test__/testUtils'
+import { VIEWER_STATUS_COPY } from './imageViewerStatus.logic'
+import { installImageViewerHarness } from './__test__/testUtils'
+import {
+  FRESHNESS_NOTICE_COPY,
+  FRESHNESS_NOTICE_TEST_IDS
+} from '../../FileConflictNotification/freshnessNoticeCopy'
+
+/** The first subscribe and its one automatic restart, both refused (#478 G5). */
+const REFUSED_TWICE = 2
 
 const h = installImageViewerHarness()
 
@@ -70,10 +77,11 @@ describe('ImageViewerPanel – live refresh', () => {
 
       const banner = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
       expect(banner).toHaveAttribute('data-variant', 'unavailable')
-      expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.unavailableWatcherError)
+      expect(banner).toHaveTextContent(FRESHNESS_NOTICE_COPY.stopped('icon.png'))
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeInTheDocument()
 
-      // The toolbar slot does NOT repeat it: role="alert" and role="status"
-      // announcing the same sentence is one message too many (QG-11a).
+      // The toolbar slot does NOT repeat it: two regions announcing the same
+      // sentence is one message too many (QG-11a; one notice per panel – F13).
       const slot = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_STATUS)
       expect(slot).toHaveAttribute('data-state', 'idle')
       expect(slot).toHaveTextContent('')
@@ -83,53 +91,47 @@ describe('ImageViewerPanel – live refresh', () => {
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_ZOOM_LEVEL)).toHaveTextContent('125%')
     })
 
-    it('names the cap and the remedy when the cap refused the watch', async () => {
-      // Verbatim message from `FileWatcherService.watchFile` - the only thing
-      // that entitles the viewer to blame the cap.
-      h.fileWatch.start.mockResolvedValue({
-        success: false,
-        error: 'Maximum watched files limit reached (100)'
-      })
+    it('shows the watch-limit notice for a tab queued past the cap, without Reload (G9)', async () => {
+      // A queued tab is never silent (owner decision): it says why it is not
+      // live and when it will be. Reload cannot free a slot, so there is none.
+      h.fileWatch.subscribe.mockResolvedValueOnce({ status: 'queued' })
 
       await h.renderAndSettle('/proj/icon.png')
 
       const banner = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
-      expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.unavailableLimit)
-      // The remedy has to be readable, not hidden in an accessible name: the
-      // user's Reload cannot work until they close something.
-      expect(banner).toHaveTextContent('Close some tabs')
+      expect(banner).toHaveAttribute('data-notice', 'queued')
+      expect(banner).toHaveTextContent(FRESHNESS_NOTICE_COPY.queued)
+      expect(screen.queryByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).not.toBeInTheDocument()
     })
 
-    it('does not blame the cap for a non-cap watch start failure', async () => {
-      // `start` also fails when the atomic-save re-arm ends the watch while a
-      // second consumer joins it. Same degraded surface, different cause: the
-      // user has no tabs to close, so the copy must not tell them to.
-      h.fileWatch.start.mockResolvedValue({
-        success: false,
-        error: 'File watch ended while joining: /proj/icon.png'
-      })
+    it('does not blame the cap for a watch that could not start', async () => {
+      // Same degraded surface, different cause: the user has no tabs to close,
+      // so the copy must not talk about too many files.
+      for (let i = 0; i < REFUSED_TWICE; i++) {
+        h.fileWatch.subscribe.mockResolvedValueOnce({ status: 'refused', code: 'WATCH_FAILED' })
+      }
 
       await h.renderAndSettle('/proj/icon.png')
 
       const banner = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
-      expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.unavailableWatcherError)
-      expect(banner).not.toHaveTextContent('Close some tabs')
+      expect(banner).toHaveTextContent(FRESHNESS_NOTICE_COPY.stopped('icon.png'))
+      expect(banner).not.toHaveTextContent('Too many files')
     })
 
-    it('still reports a dead watch while the banner is reporting the deletion', async () => {
-      // Two facts, two surfaces: the banner takes the more specific one and the
-      // slot keeps the other, so neither disappears.
+    it('shows one notice per panel: a deletion outranks a dead watch (F13)', async () => {
+      // The deleted state's own probe follows the file back, so the deletion is
+      // the one fact the user needs; the slot does not add a second notice.
       await h.renderAndSettle('/proj/icon.png')
 
-      h.emitWatchError('/proj/icon.png', 'ENOSPC')
       h.getStats.mockRejectedValue(new Error('ENOENT'))
       h.emitDeleted('/proj/icon.png')
-
       const banner = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
       await waitFor(() => expect(banner).toHaveAttribute('data-variant', 'deleted'))
-      const slot = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_STATUS)
-      expect(slot).toHaveAttribute('data-state', 'unavailable')
-      expect(slot).toHaveTextContent(VIEWER_STATUS_COPY.unavailable)
+      h.emitWatchError('/proj/icon.png', 'ENOSPC')
+
+      expect(screen.getAllByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)).toHaveLength(1)
+      expect(banner).toHaveAttribute('data-variant', 'deleted')
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_STATUS)).toHaveAttribute('data-state', 'idle')
     })
 
     it('keeps exactly one live region per subject while full screen is open (QG-6 M5)', async () => {
@@ -147,7 +149,9 @@ describe('ImageViewerPanel – live refresh', () => {
       // pins is two regions saying the SAME thing, not two subjects.
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_STATUS)).toBeInTheDocument()
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_EXPORT_STATUS)).toBeInTheDocument()
-      expect(screen.getAllByRole('status')).toHaveLength(2)
+      // The freshness notice's announcer (#478 F13) is the third subject, also once
+      expect(screen.getByTestId(FRESHNESS_NOTICE_TEST_IDS.status)).toBeInTheDocument()
+      expect(screen.getAllByRole('status')).toHaveLength(3)
     })
 
     it('still announces a refresh that lands while full screen is open', async () => {
@@ -170,9 +174,11 @@ describe('ImageViewerPanel – live refresh', () => {
   describe('Reload feedback (QG-11a H4)', () => {
     it('says the file is still missing when Reload finds nothing', async () => {
       await h.renderAndSettle('/proj/icon.png')
+      // The watch died, and the file is gone by the time the user presses Reload
+      h.emitWatchError('/proj/icon.png', 'ENOSPC')
+      await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)
       h.getStats.mockRejectedValue(new Error('ENOENT'))
-      h.emitDeleted('/proj/icon.png')
-      await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
+      h.fileWatch.subscribe.mockResolvedValueOnce({ status: 'refused', code: 'NOT_FOUND' })
 
       fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD))
 
@@ -194,9 +200,8 @@ describe('ImageViewerPanel – live refresh', () => {
       h.emitWatchError('/proj/icon.png', 'ENOSPC')
       await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
 
-      // The file is readable, so `recover` gets past the stat - and the restart
-      // is what fails.
-      h.fileWatch.start.mockResolvedValue({ success: false, error: 'ENOSPC' })
+      // The file is readable - and the restart is what fails.
+      h.fileWatch.subscribe.mockResolvedValue({ status: 'refused', code: 'WATCH_FAILED' })
       fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD))
 
       const slot = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_STATUS)
@@ -211,15 +216,13 @@ describe('ImageViewerPanel – live refresh', () => {
       fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_FULLSCREEN))
       const overlay = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_FULLSCREEN)
 
-      h.getStats.mockRejectedValue(new Error('ENOENT'))
-      h.emitDeleted('/proj/icon.png')
+      h.emitWatchError('/proj/icon.png', 'ENOSPC')
 
       const banner = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
       expect(overlay).toContainElement(banner)
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeInTheDocument()
-      // One alert region, not two: the panel's copy is suppressed while the
-      // overlay owns the surface.
-      expect(alertsExcludingExportRegion()).toHaveLength(1)
+      // One banner, not two: the panel's copy is suppressed while the overlay owns the surface
+      expect(screen.getAllByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)).toHaveLength(1)
     })
 
     it('moves the banner back into the panel when full screen closes', async () => {
@@ -230,7 +233,7 @@ describe('ImageViewerPanel – live refresh', () => {
 
       fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_FULLSCREEN))
       await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_FULLSCREEN)
-      expect(alertsExcludingExportRegion()).toHaveLength(1)
+      expect(screen.getAllByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)).toHaveLength(1)
 
       fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_CLOSE))
 

@@ -31,6 +31,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { logger } from '../../../../utils/logger'
 import { fileGateway } from '../../../../services/fileGateway'
+import type { FileStamp } from '../../../../../../shared/freshness/freshnessTypes'
 
 // ============================================================================
 // Types
@@ -58,6 +59,11 @@ export interface ImageSource {
    * Never parse it or build one: what goes into it is a main-process detail.
    */
   version: string
+  /**
+   * The stamp of these bytes (#478): the freshness tracker starts from it and
+   * compares the disk against it. Absent only from an older main process.
+   */
+  stamp?: FileStamp
   /** Intrinsic width reported by the off-DOM decoder. */
   naturalWidth: number
   /** Intrinsic height reported by the off-DOM decoder. */
@@ -76,6 +82,13 @@ export interface ImageSource {
   fileSize: number
   /** Milliseconds since the epoch when these bytes were read. */
   updatedAt: number
+}
+
+/** Bytes handed to {@link UseImageSourceResult.pushSource}. */
+export interface PushedImageBytes {
+  dataUrl: string
+  version: string
+  stamp: FileStamp
 }
 
 /** Intrinsic dimensions handed to {@link UseImageSourceOptions.onSourceCommit}. */
@@ -142,6 +155,12 @@ export interface UseImageSourceResult {
   isStale: boolean
   /** Request a re-read. Defers to the next visibility transition while hidden. */
   refresh: () => void
+  /**
+   * Show bytes the freshness tracker already read (#478 F30): decoded and
+   * committed exactly like a refresh, with no second read. Bytes of the
+   * version already on screen are ignored.
+   */
+  pushSource: (bytes: PushedImageBytes) => void
   /** `<img onError>` handler: reverts to the last good source, or reports failure. */
   handleImageError: () => void
 }
@@ -290,7 +309,7 @@ export function useImageSource(options: UseImageSourceOptions): UseImageSourceRe
    * good image on screen and only produces a log line.
    */
   const load = useCallback(
-    async (mode: 'initial' | 'refresh'): Promise<void> => {
+    async (mode: 'initial' | 'refresh', pushed?: PushedImageBytes): Promise<void> => {
       if (!filePath) {
         setError('No file path provided')
         setIsLoading(false)
@@ -318,7 +337,10 @@ export function useImageSource(options: UseImageSourceOptions): UseImageSourceRe
         // or a repoint to another file must always do a full read, never
         // compare against the version of the file it has stopped showing.
         const knownVersion = currentSourceRef.current?.version
-        const response = await fileGateway.readImage({ filePath, knownVersion })
+        // Bytes the freshness tracker already read are decoded as they are (F30)
+        const response = pushed
+          ? { status: 'ok' as const, dataUrl: pushed.dataUrl, version: pushed.version, stamp: pushed.stamp }
+          : await fileGateway.readImage({ filePath, knownVersion })
 
         // `unchanged` is a SUCCESS meaning "you are already current", so this
         // returns without decoding, without committing and without moving
@@ -329,9 +351,10 @@ export function useImageSource(options: UseImageSourceOptions): UseImageSourceRe
         // bytes succeeded.
         if (response.status === 'unchanged') return
 
-        const { dataUrl: url, version } = response
+        const { dataUrl: url, version, stamp } = response
         const { naturalWidth, naturalHeight } = await decodeOffDom(url)
-        const fileSize = await safeGetFileSize(filePath)
+        // Pushed bytes carry their size in the stamp: no stat round trip
+        const fileSize = pushed ? pushed.stamp.size : await safeGetFileSize(filePath)
 
         // Out-of-order guard: a slower earlier read must never overwrite a
         // newer one that already committed.
@@ -343,6 +366,7 @@ export function useImageSource(options: UseImageSourceOptions): UseImageSourceRe
           // Same atomic commit as the bytes: a version stored separately could
           // outlive a reverted `src` and skip the refresh that fixes it.
           version,
+          ...(stamp ? { stamp } : {}),
           naturalWidth,
           naturalHeight,
           generation,
@@ -460,5 +484,13 @@ export function useImageSource(options: UseImageSourceOptions): UseImageSourceRe
     setError('Failed to display image')
   }, [filePath, commitToView])
 
-  return { source, isLoading, error, isStale, refresh, handleImageError }
+  const pushSource = useCallback(
+    (bytes: PushedImageBytes) => {
+      if (currentSourceRef.current?.version === bytes.version) return
+      void load('refresh', bytes)
+    },
+    [load]
+  )
+
+  return { source, isLoading, error, isStale, refresh, pushSource, handleImageError }
 }

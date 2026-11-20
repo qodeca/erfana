@@ -4,7 +4,7 @@
  * File Operations Hook Interface
  *
  * Defines the contract for the useFileOperations hook, which encapsulates
- * all file/folder CRUD operations (create, rename, delete).
+ * the tree's create and rename operations (delete is a context-menu command).
  *
  * This interface follows the Dependency Inversion Principle by allowing
  * the hook to accept optional dependencies for testing and flexibility.
@@ -109,22 +109,6 @@ export interface IUseFileOperationsReturn {
    * - Used by context menu
    */
   handleNewFolderInFolder: (folderPath: string) => void
-
-  /**
-   * Delete a file with confirmation
-   * - Shows confirmation dialog
-   * - Deletes file via IPC
-   * - Refreshes tree
-   */
-  handleDeleteFile: (filePath: string, fileName: string) => Promise<void>
-
-  /**
-   * Delete a folder (and all contents) with confirmation
-   * - Shows confirmation dialog
-   * - Deletes folder via IPC
-   * - Refreshes tree
-   */
-  handleDeleteFolder: (folderPath: string, folderName: string) => Promise<void>
 
   /**
    * Rename a file or folder

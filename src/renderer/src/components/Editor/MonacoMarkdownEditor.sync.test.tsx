@@ -56,6 +56,9 @@ function createFakeEditor(initial: string) {
 
   const model = {
     getValue: () => text,
+    // Every text here is LF, so the model's ending never changes
+    getEOL: () => '\n',
+    pushEOL: vi.fn(),
     setValue: vi.fn((next: string) => {
       text = next
       undoStack.length = 0

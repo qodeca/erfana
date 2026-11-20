@@ -106,15 +106,16 @@ const TERMINAL_METHODS: Record<keyof TerminalBridge, true> = {
 }
 
 const FILE_WATCH_METHODS: Record<keyof FileWatchBridge, true> = {
-  start: true,
-  stop: true,
-  stopAll: true,
-  pause: true,
-  resume: true,
+  subscribe: true,
+  unsubscribe: true,
+  pauseWatch: true,
+  resumeWatch: true,
+  probe: true,
+  readText: true,
+  writeText: true,
   getStats: true,
-  onFileChanged: true,
-  onFileDeleted: true,
-  onFileError: true
+  onEvent: true,
+  onCheck: true
 }
 
 const DIRECTORY_WATCH_METHODS: Record<keyof DirectoryWatchBridge, true> = {

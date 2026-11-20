@@ -5,9 +5,10 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 **Watchers** (`watcher/`)
 
 - `singleFileWatch` is the one place a single-file chokidar watcher is built. chokidar 5 has no globbing, so a glob-looking name (`[draft] {v2}.md`) is literal – `singleFileWatch.rename.integration.test.ts` pins that.
+- `armWatch` is the one place a file watch is (re-)armed (#478): it re-checks realpath confinement and "a regular file", closes the old watcher before creating the new one, and folds concurrent arms per entry. `FileWatcherService` extends `watcher/FileWatchCore` (state, native-watcher events, helpers) – members are `protected` because the service and the e2e freshness hook reach them by name.
 - `atomicRearm` owns the unlink branch (atomic save re-arm vs genuine delete) and re-checks realpath confinement there.
 - `DirectoryWatcherService` is layered (finding [65]): `watcher/DirectoryWatcherCore` ← `DirectoryWatcherRecovery` ← `DirectoryWatcherEvents` ← the service. Members are `protected`, not `private`, because the suites read and spy on them by name (`watchedDirectories`, `switchVersion`, `queueEvent`, `processEvents`, `scheduleRestart`, `restartWatcher`, …) – keep the names, and call them through `this` so a spy still sees the call.
-- Reuse `rearmingSingleFileWatch` (singleFileWatch + atomicRearm) for any single-file watcher that must keep firing across atomic editor saves.
+- Every file watch goes through `FileWatcherService`, windows and main-side consumers alike (#478, F2). A main-side consumer is an in-process owner: `freshness/mainTrackedWatch` (a freshness tracker on `freshness/mainFreshnessSource`) for one followed file – the HTML preview's page, the comment watches – or `preview/PreviewWatchPool` for a view's sub-files. Never build a chokidar watcher of your own: caps (buckets), the waitlist, the project-switch suspension, the health round and the wake re-arm only reach watches on that layer. `freshness/mainFreshnessRegistry` is the main side's window-focus check.
 
 **Media / export**
 
@@ -31,5 +32,5 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 - `PreviewStorageSeal`: `PURGED_STORAGES` deliberately omits `shadercache` – it never settles on Windows and holds compiled GPU programs, not page data.
 - `previewSessionPolicy` is the single construction site for the view's `WebPreferences`, the runtime session hardening and the partition naming; it never touches response headers, so the CSP keeps one owner.
 - `PreviewStillFrameCache`: a still-frame capture is STARTED only while the view is drawn, but its retry after an empty first capture may land after the tab was switched away. The caller's `shouldKeep` veto guards a REPLACEMENT only; an empty slot is exempt, because on macOS the first capture is always empty.
-- `previewWatchBudget` is the process-wide watch ceiling shared by every per-view pool.
+- The preview's watch ceilings are the `preview` watch bucket (16 per owner, 64 in all, `shared/freshness/timingProfiles.ts`), counted by `FileWatcherService`: each view's `PreviewWatchPool` is one owner there, and its page file (`mainTrackedWatch`) another.
 - IPC handlers live outside this directory: the composition root `src/main/ipc/preview-handlers.ts` (builds the preview graph and registers the handler bundles, including `preview:navigate` and `preview:focusPage`) and the bundles in `src/main/ipc/preview/`.

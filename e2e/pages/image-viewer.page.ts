@@ -214,6 +214,20 @@ export class ImageViewerPage {
     await this.waitForReady()
   }
 
+  /**
+   * Bring an open image tab forward by clicking its dockview tab (image tabs
+   * use dockview's own tab, not the editor tab component). Unlike
+   * {@link openFromTree} it works while the file's folder is collapsed or the
+   * file is briefly gone from the tree.
+   */
+  async activateTab(fileName: string): Promise<void> {
+    await this.page.locator('.dv-tab').filter({ hasText: fileName }).click()
+    await expect(this.page.locator('.dv-tab.dv-active-tab').filter({ hasText: fileName }).first()).toBeVisible({
+      timeout: this.defaultTimeout
+    })
+    await this.waitForReady()
+  }
+
   /** Wait until the panel has decoded and painted an image. */
   async waitForReady(): Promise<void> {
     await expect(this.panel()).toBeVisible({ timeout: this.defaultTimeout })

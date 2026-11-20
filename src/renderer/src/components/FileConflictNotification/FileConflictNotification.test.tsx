@@ -9,6 +9,7 @@
  * - Rendering (2 tests)
  * - Test IDs (4 tests)
  * - Accessibility (2 tests)
+ * - Not saved copy (1 test)
  * - Callbacks (4 tests)
  */
 
@@ -66,16 +67,34 @@ describe('FileConflictNotification', () => {
   })
 
   describe('Accessibility', () => {
-    it('should have role="alert" on the container', () => {
+    it('carries no live-region role of its own (the panel status region announces it – #478 F13)', () => {
       renderComponent()
       const container = screen.getByTestId(TEST_IDS.FILE_CONFLICT_NOTIFICATION)
-      expect(container).toHaveAttribute('role', 'alert')
+      expect(container).not.toHaveAttribute('role')
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
-    it('should have aria-label="Dismiss" on the dismiss button', () => {
+    it('names what Dismiss does: it keeps your version (#478 U4, owner decision N6)', () => {
       renderComponent()
-      const dismissBtn = screen.getByTestId(TEST_IDS.FILE_CONFLICT_BTN_DISMISS)
-      expect(dismissBtn).toHaveAttribute('aria-label', 'Dismiss')
+      expect(screen.getByRole('button', { name: 'Dismiss – keeps your version' })).toBe(
+        screen.getByTestId(TEST_IDS.FILE_CONFLICT_BTN_DISMISS)
+      )
+    })
+
+    it('hides every icon from assistive technology: they are decoration (#478 U7)', () => {
+      renderComponent()
+      const icons = screen.getByTestId(TEST_IDS.FILE_CONFLICT_NOTIFICATION).querySelectorAll('svg')
+      expect(icons).toHaveLength(3)
+      icons.forEach((icon) => expect(icon).toHaveAttribute('aria-hidden', 'true'))
+    })
+  })
+
+  describe('Not saved copy', () => {
+    it('says the autosave was not saved when it was given up (#478 F16)', () => {
+      render(<FileConflictNotification {...defaultProps} notSaved />)
+      expect(screen.getByTestId(TEST_IDS.FILE_CONFLICT_NOTIFICATION)).toHaveTextContent(
+        'Not saved – example.md changed on disk since it was last read.'
+      )
     })
   })
 

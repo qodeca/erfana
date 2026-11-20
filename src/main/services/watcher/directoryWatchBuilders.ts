@@ -9,7 +9,7 @@
 import chokidar from 'chokidar'
 import { logger } from '../LoggingService'
 import type { ProjectPathFilter } from '../../utils/projectPathFilter'
-import { NativeRecursiveWatcher } from './NativeRecursiveWatcher'
+import { NativeRecursiveWatcher, type NativeFsWatch } from './NativeRecursiveWatcher'
 import type { DirectoryWatchHandle, DirectoryWatchResyncReason } from './directoryWatchBackend'
 import { isPresent } from './directoryWatchTypes'
 
@@ -58,6 +58,8 @@ export interface NativeWatcherContext {
   readonly onResync: (reason: DirectoryWatchResyncReason) => void
   /** The watcher overflowed (counted, D3). */
   readonly onOverflow: () => void
+  /** Opens the native handles; `fs.watch` when absent (the service passes its releasable ones, #486). */
+  readonly fsWatch?: NativeFsWatch
 }
 
 /**
@@ -79,7 +81,8 @@ export function createNativeWatcher(dirPath: string, context: NativeWatcherConte
     shouldDrop: context.shouldDrop,
     splitPaths: [...pathEntries, ...walkHints],
     splitInputsCapped: filter.splitInputsCapped,
-    caseSensitive
+    caseSensitive,
+    ...(context.fsWatch ? { fsWatch: context.fsWatch } : {})
   })
   attachNativeListeners(watcher, walkHints.length, context)
   return watcher

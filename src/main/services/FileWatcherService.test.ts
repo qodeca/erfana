@@ -1,392 +1,272 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { SubscriberCounter } from './watcher/SubscriberCounter'
+/**
+ * FileWatcherService with window subscriptions: window cleanup (issue #59),
+ * several consumers of one file (issue #70, D3), the watch cap (issue #70,
+ * arch H1; #478 G9) and the project-switch guard. Each subscription has its
+ * own `watchId` (#478, plan S9) and hears its own events.
+ *
+ * chokidar, `fs/promises` and Electron are fake at module scope (every path
+ * below the fake project answers "a file"), hence a file of its own.
+ */
+import path from 'path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Capture sends
-const sends: Array<{ id: number; channel: string; payload: any }> = []
+const harness = vi.hoisted(() => ({
+  sends: [] as Array<{ id: number; channel: string; payload: Record<string, unknown> }>,
+  watchers: [] as Array<{
+    path: string
+    handlers: Map<string, (...args: unknown[]) => void>
+    close: ReturnType<typeof vi.fn>
+  }>
+}))
+
+vi.mock('chokidar', () => {
+  const watch = vi.fn((watchedPath: string) => {
+    const handlers = new Map<string, (...args: unknown[]) => void>()
+    const close = vi.fn(async () => {})
+    const watcher = {
+      on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
+        handlers.set(event, listener)
+        return watcher
+      }),
+      // Says `ready` at once: a subscribe answers after it (#478 G3)
+      once: vi.fn((event: string, listener: () => void) => {
+        if (event === 'ready') queueMicrotask(listener)
+        return watcher
+      }),
+      close
+    }
+    harness.watchers.push({ path: watchedPath, handlers, close })
+    return watcher
+  })
+  return { default: { watch }, watch }
+})
+
+vi.mock('fs/promises', async importOriginal => {
+  const real = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...real,
+    stat: vi.fn(async () => ({ isFile: () => true, isDirectory: () => false, size: 1 })),
+    realpath: vi.fn(async (p: string) => p)
+  }
+})
 
 vi.mock('electron', () => {
   const mkWin = (id: number) => ({
     isDestroyed: () => false,
-    webContents: { id, send: (ch: string, p: any) => sends.push({ id, channel: ch, payload: p }) }
-  })
-  return {
-    BrowserWindow: {
-      getAllWindows: vi.fn(() => [mkWin(1)])
+    webContents: {
+      id,
+      send: (channel: string, payload: Record<string, unknown>) => harness.sends.push({ id, channel, payload })
     }
-  }
+  })
+  return { BrowserWindow: { getAllWindows: vi.fn(() => [mkWin(1), mkWin(2)]) } }
 })
 
-describe('FileWatcherService session token guards', () => {
-  beforeEach(() => {
-    sends.length = 0
-  })
+import { FileWatcherService } from './FileWatcherService'
+import { testSession, type TestSession } from './watcher/__test__/testSession'
+import { WindowWatches } from './watcher/__test__/windowWatches'
+import { WATCH_BUCKETS } from '../../shared/freshness/timingProfiles'
 
-  it('drops notifications from previous sessions', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
+const ROOT = path.resolve(path.sep, 'proj')
+const at = (name: string): string => path.join(ROOT, name)
+/** Past the write-finish gate. */
+const DELIVERY_MS = 1_000
 
-    // Seed watched file with old version 0
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/readme.md', {
-      filePath: '/proj/readme.md',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: 0
-    })
+let svc: FileWatcherService
+let session: TestSession
+let w: WindowWatches
+const STAMP = { size: 1, mtimeMs: 1, ctimeMs: 1, ino: '1' }
 
-    // Simulate project switch bumping session
-    svc.switchVersion = 1
+/** Fire chokidar `change` on the newest watcher of `filePath` and let the gate run. */
+async function change(filePath: string): Promise<void> {
+  const watcher = harness.watchers.filter(w => w.path === filePath).at(-1)
+  if (!watcher) throw new Error(`setup: no watcher for ${filePath}`)
+  watcher.handlers.get('change')?.()
+  await vi.advanceTimersByTimeAsync(DELIVERY_MS)
+}
 
-    // Attempt to notify via private API; should be ignored due to version mismatch
-    svc.notifyWebContents('/proj/readme.md', 'file-watch:changed', { filePath: '/proj/readme.md' })
+const changedTo = (filePath: string): number[] => w.to(filePath, 'changed')
 
-    expect(sends.length).toBe(0)
+const watcherOf = (filePath: string) => harness.watchers.filter(w => w.path === filePath).at(-1)
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  harness.sends.length = 0
+  harness.watchers.length = 0
+  session = testSession(ROOT)
+  svc = new FileWatcherService({ session, stampFile: async () => STAMP })
+  w = new WindowWatches(svc, harness.sends)
+})
+
+afterEach(async () => {
+  await svc.dispose()
+  vi.useRealTimers()
+})
+
+describe('FileWatcherService project-switch guard', () => {
+  it('drops the events of a watch the project switch ended', async () => {
+    const file = at('readme.md')
+    await w.watch(file, 1)
+    const oldWatcher = watcherOf(file)
+
+    await svc.suspendAll()
+    await svc.endSuspended(session.switchTo(ROOT))
+    oldWatcher?.handlers.get('change')?.()
+    await vi.advanceTimersByTimeAsync(DELIVERY_MS)
+
+    // The window is told its watch ended with the project, and nothing else
+    expect(w.kinds()).toEqual(['ended'])
+    expect(w.events()[0]).toMatchObject({ window: 1, reason: 'project-switch' })
+    expect(svc.getStats().totalWatched).toBe(0)
   })
 })
 
 describe('FileWatcherService Issue #59 - WebContents Cleanup', () => {
-  beforeEach(() => {
-    sends.length = 0
-  })
+  it('cleanupForWebContentsId removes that window from a watch another window holds', async () => {
+    const file = at('file.md')
+    await w.watch(file, 1)
+    await w.watch(file, 2)
 
-  it('cleanupForWebContentsId increments switchVersion BEFORE cleanup', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-
-    // Record initial switchVersion
-    const initialVersion = svc.switchVersion
-
-    // Seed watched file
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/file.md', {
-      filePath: '/proj/file.md',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: initialVersion
-    })
-
-    // Call cleanupForWebContentsId
     await svc.cleanupForWebContentsId(1)
 
-    // switchVersion should be incremented immediately (before cleanup)
-    expect(svc.switchVersion).toBe(initialVersion + 1)
+    expect(svc.getStats().fileDetails).toEqual([{ path: file, watchers: 1 }])
+    await change(file)
+    expect(changedTo(file)).toEqual([2])
   })
 
-  it('cleanupForWebContentsId removes webContentsId from watched files', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
+  it('cleanupForWebContentsId closes watchers with no remaining window', async () => {
+    const file = at('file.md')
+    await w.watch(file, 1)
 
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/file.md', {
-      filePath: '/proj/file.md',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1, 2]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-
-    // Cleanup webContentsId 1
     await svc.cleanupForWebContentsId(1)
 
-    // webContentsId 1 should be removed, 2 should remain
-    const watched = svc.watchedFiles.get('/proj/file.md')
-    expect(watched).toBeTruthy()
-    expect(watched.subscribers.has(1)).toBe(false)
-    expect(watched.subscribers.has(2)).toBe(true)
-  })
-
-  it('cleanupForWebContentsId closes watchers with no remaining webContentsIds', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/file.md', {
-      filePath: '/proj/file.md',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-
-    // Cleanup webContentsId 1 (last watcher)
-    await svc.cleanupForWebContentsId(1)
-
-    // Watcher should be closed and removed
-    expect(fakeWatcher.close).toHaveBeenCalled()
-    expect(svc.watchedFiles.has('/proj/file.md')).toBe(false)
-  })
-
-  it('cleanupForWebContentsId clears debounce timers', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    const fakeTimer = setTimeout(() => {}, 10000) // Long timeout that should be cleared
-
-    svc.watchedFiles.set('/proj/file.md', {
-      filePath: '/proj/file.md',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1]),
-      isPaused: false,
-      debounceTimer: fakeTimer,
-      version: svc.switchVersion
-    })
-
-    // Spy on clearTimeout
-    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout')
-
-    // Cleanup webContentsId 1
-    await svc.cleanupForWebContentsId(1)
-
-    // Timer should be cleared
-    expect(clearTimeoutSpy).toHaveBeenCalledWith(fakeTimer)
+    expect(watcherOf(file)?.close).toHaveBeenCalledTimes(1)
+    expect(svc.getStats().totalWatched).toBe(0)
   })
 
   it('cleanupForWebContentsId handles multiple files', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
+    await w.watch(at('file1.md'), 1)
+    await w.watch(at('file2.md'), 1)
 
-    const fakeWatcher1 = { close: vi.fn(async () => {}) }
-    const fakeWatcher2 = { close: vi.fn(async () => {}) }
-
-    svc.watchedFiles.set('/proj/file1.md', {
-      filePath: '/proj/file1.md',
-      watcher: fakeWatcher1,
-      subscribers: SubscriberCounter.from([1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-
-    svc.watchedFiles.set('/proj/file2.md', {
-      filePath: '/proj/file2.md',
-      watcher: fakeWatcher2,
-      subscribers: SubscriberCounter.from([1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-
-    // Cleanup webContentsId 1
     await svc.cleanupForWebContentsId(1)
 
-    // Both watchers should be closed
-    expect(fakeWatcher1.close).toHaveBeenCalled()
-    expect(fakeWatcher2.close).toHaveBeenCalled()
-    expect(svc.watchedFiles.size).toBe(0)
+    expect(svc.getStats().totalWatched).toBe(0)
+    expect(harness.watchers.every(w => w.close.mock.calls.length === 1)).toBe(true)
   })
 
-  it('cleanupForWebContentsId does not affect other webContentsIds', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
+  it('cleanupForWebContentsId does not affect other windows', async () => {
+    const file = at('file.md')
+    await w.watch(file, 1)
 
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/file.md', {
-      filePath: '/proj/file.md',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1, 2, 3]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-
-    // Cleanup webContentsId 2
     await svc.cleanupForWebContentsId(2)
 
-    // webContentsId 2 should be removed, 1 and 3 should remain
-    const watched = svc.watchedFiles.get('/proj/file.md')
-    expect(watched).toBeTruthy()
-    expect(watched.subscribers.has(1)).toBe(true)
-    expect(watched.subscribers.has(2)).toBe(false)
-    expect(watched.subscribers.has(3)).toBe(true)
-    // Watcher should NOT be closed (other watchers remain)
-    expect(fakeWatcher.close).not.toHaveBeenCalled()
+    expect(svc.getStats().fileDetails).toEqual([{ path: file, watchers: 1 }])
+    expect(watcherOf(file)?.close).not.toHaveBeenCalled()
   })
 
   it('cleanupForWebContentsId handles double cleanup gracefully', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/file.md', {
-      filePath: '/proj/file.md',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-
-    // First cleanup
+    await w.watch(at('file.md'), 1)
     await svc.cleanupForWebContentsId(1)
-    expect(svc.watchedFiles.has('/proj/file.md')).toBe(false)
+    expect(svc.getStats().totalWatched).toBe(0)
 
-    // Second cleanup - should not throw
     await expect(svc.cleanupForWebContentsId(1)).resolves.not.toThrow()
   })
 })
 
 describe('FileWatcherService subscriber counting (issue #70, D3)', () => {
-  beforeEach(() => {
-    sends.length = 0
-  })
-
   it('keeps the watch alive when one of two consumers in the same window unsubscribes', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-
     // Two panels in ONE window watching one path: an image viewer and the
-    // Markdown editor. Before subscriber counting the first teardown closed
-    // the watcher out from under the second.
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/icon.svg', {
-      filePath: '/proj/icon.svg',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1, 1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
+    // Markdown editor. The first teardown must not close the watcher under the second.
+    const file = at('icon.svg')
+    await w.watch(file, 1)
+    await w.watch(file, 1)
 
-    await svc.unwatchFile('/proj/icon.svg', { id: 1 })
+    await w.unwatch(file, 1)
 
-    expect(fakeWatcher.close).not.toHaveBeenCalled()
-    expect(svc.watchedFiles.has('/proj/icon.svg')).toBe(true)
-
-    // The surviving consumer still receives events
-    svc.notifyWebContents('/proj/icon.svg', 'file-watch:changed', { filePath: '/proj/icon.svg' })
-    expect(sends).toEqual([
-      { id: 1, channel: 'file-watch:changed', payload: { filePath: '/proj/icon.svg' } }
-    ])
+    expect(watcherOf(file)?.close).not.toHaveBeenCalled()
+    expect(svc.getStats().totalWatched).toBe(1)
+    // The surviving consumer still receives events: one subscription, one event
+    await change(file)
+    expect(changedTo(file)).toEqual([1])
   })
 
   it('closes the watch when the last consumer in the window unsubscribes', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
+    const file = at('icon.svg')
+    await w.watch(file, 1)
+    await w.watch(file, 1)
 
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/icon.svg', {
-      filePath: '/proj/icon.svg',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1, 1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
+    await w.unwatch(file, 1)
+    await w.unwatch(file, 1)
 
-    await svc.unwatchFile('/proj/icon.svg', { id: 1 })
-    await svc.unwatchFile('/proj/icon.svg', { id: 1 })
-
-    expect(fakeWatcher.close).toHaveBeenCalledTimes(1)
-    expect(svc.watchedFiles.has('/proj/icon.svg')).toBe(false)
+    expect(watcherOf(file)?.close).toHaveBeenCalledTimes(1)
+    expect(svc.getStats().totalWatched).toBe(0)
   })
 
   it('destroying a webContents drops all its subscriptions at once', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-
-    // A destroyed window cannot release its subscriptions one by one, so the
-    // cleanup path must remove the id outright rather than decrement it.
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/icon.svg', {
-      filePath: '/proj/icon.svg',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1, 1, 1]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
+    const file = at('icon.svg')
+    for (let i = 0; i < 3; i++) await w.watch(file, 1)
 
     await svc.cleanupForWebContentsId(1)
 
-    expect(fakeWatcher.close).toHaveBeenCalled()
-    expect(svc.watchedFiles.has('/proj/icon.svg')).toBe(false)
+    expect(watcherOf(file)?.close).toHaveBeenCalled()
+    expect(svc.getStats().totalWatched).toBe(0)
   })
 
   it('reports one watcher per window in getStats, not one per subscription', async () => {
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-    svc.watchedFiles.clear()
+    const file = at('icon.svg')
+    await w.watch(file, 1)
+    await w.watch(file, 1)
+    await w.watch(file, 2)
 
-    const fakeWatcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set('/proj/icon.svg', {
-      filePath: '/proj/icon.svg',
-      watcher: fakeWatcher,
-      subscribers: SubscriberCounter.from([1, 1, 2]),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-
-    expect(svc.getStats()).toEqual({
+    expect(svc.getStats()).toMatchObject({
       totalWatched: 1,
-      fileDetails: [{ path: '/proj/icon.svg', watchers: 2 }]
+      fileDetails: [{ path: file, watchers: 2 }],
+      subscriptions: 3
     })
   })
 })
 
-describe('FileWatcherService watch cap (issue #70, arch H1)', () => {
-  /** Seed a watched entry the service will treat as live. */
-  const seed = (svc: any, filePath: string, ids: number[]) => {
-    const watcher = { close: vi.fn(async () => {}) }
-    svc.watchedFiles.set(filePath, {
-      filePath,
-      watcher,
-      subscribers: SubscriberCounter.from(ids),
-      isPaused: false,
-      debounceTimer: null,
-      version: svc.switchVersion
-    })
-    return watcher
-  }
+describe('FileWatcherService watch cap (issue #70, arch H1; #478 G9)', () => {
+  it('lets a second consumer join a watched path with the bucket at capacity', async () => {
+    svc.setBucketCap('tabs', 1)
+    const file = at('icon.svg')
+    await w.watch(file, 1)
 
-  it('lets a second consumer join a watched path with the map at capacity', async () => {
-    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs')
-    const { join } = await import('node:path')
-    const { tmpdir } = await import('node:os')
-    const dir = mkdtempSync(join(tmpdir(), 'erfana-watch-cap-'))
-    const file = join(dir, 'icon.svg')
-    const other = join(dir, 'other.svg')
-    writeFileSync(file, '<svg/>')
-    writeFileSync(other, '<svg/>')
+    // A second panel in the SAME window joins the existing watch: refusing it
+    // would leave it watching nothing while its unmount still released
+    await expect(w.watch(file, 1)).resolves.toMatchObject({ status: 'started' })
+    await w.unwatch(file, 1)
 
-    const mod = await import('./FileWatcherService')
-    const svc: any = mod.fileWatcherService
-    svc.watchedFiles.clear()
+    expect(watcherOf(file)?.close).not.toHaveBeenCalled()
+    expect(svc.getStats().totalWatched).toBe(1)
+  })
 
-    // One real watch plus filler up to MAX_WATCHED_FILES.
-    const watcher = seed(svc, file, [1])
-    while (svc.watchedFiles.size < svc.MAX_WATCHED_FILES) {
-      seed(svc, `/proj/filler-${svc.watchedFiles.size}.md`, [1])
-    }
-    expect(svc.watchedFiles.size).toBe(svc.MAX_WATCHED_FILES)
+  it('queues a new file past the cap and arms it when a slot frees', async () => {
+    svc.setBucketCap('tabs', 1)
+    const first = at('first.md')
+    const queued = at('queued.md')
+    await w.watch(first, 1)
 
-    // A second panel in the SAME window joins the existing watch. Refusing it
-    // here is what reintroduced D3: it would watch nothing, and its unmount
-    // would still decrement the count to zero and close the watcher under the
-    // first panel.
-    await expect(svc.watchFile(file, { id: 1 })).resolves.toBeUndefined()
-    expect(svc.watchedFiles.get(file).subscribers.countFor(1)).toBe(2)
+    await expect(w.watch(queued, 1)).resolves.toMatchObject({ status: 'queued' })
+    expect(svc.getStats()).toMatchObject({ totalWatched: 1, waiting: 1 })
 
-    await svc.unwatchFile(file, { id: 1 })
+    await w.unwatch(first, 1)
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(watcher.close).not.toHaveBeenCalled()
-    expect(svc.watchedFiles.has(file)).toBe(true)
+    expect(svc.getStats()).toMatchObject({ totalWatched: 1, waiting: 0 })
+    // The armed subscription is told `started`, so it catches up with what it missed while queued
+    expect(w.to(queued, 'started')).toEqual([1])
+    await change(queued)
+    expect(changedTo(queued)).toEqual([1])
+  })
 
-    // The cap still governs a NEW entry.
-    await expect(svc.watchFile(other, { id: 1 })).rejects.toThrow(
-      'Maximum watched files limit reached'
-    )
+  it('refuses a new file once the cap and its waitlist are full', async () => {
+    svc.setBucketCap('tabs', 1)
+    await w.watch(at('first.md'), 1)
+    for (let i = 0; i < 200; i++) await w.watch(at(`queued-${i}.md`), 1)
 
-    svc.watchedFiles.clear()
-    rmSync(dir, { recursive: true, force: true })
+    await expect(w.watch(at('one-too-many.md'), 1)).resolves.toMatchObject({ status: 'refused', code: 'WATCH_FAILED' })
+    expect(WATCH_BUCKETS.tabs.totalCap).toBe(100)
   })
 })

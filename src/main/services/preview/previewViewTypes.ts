@@ -32,7 +32,7 @@ import type {
   PreviewSessionLike,
   PreviewWebContentsHandle
 } from './PreviewSessionFactory'
-import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
+import type { PreviewEntryWatcherFactory } from './previewEntryWatch'
 import type { PreviewWindowLike } from './PreviewLiveView'
 import type { PreviewEligibilityCheck } from './previewLiveTypes'
 import type { PreviewCommentShared } from './comments/commentServiceTypes'
@@ -158,10 +158,7 @@ export interface PreviewViewDeps {
     onCount: (count: PreviewFindCount) => void
   ) => IPreviewFindController
   readonly createFailureLog: (onEmit: PreviewFailureEmit) => IPreviewFailureLog
-  readonly createEntryWatcher: (
-    filePath: string,
-    handlers: { onChange(): void; onUnlink(): void; onError(error: unknown): void }
-  ) => PreviewFileWatcherHandle
+  readonly createEntryWatcher: PreviewEntryWatcherFactory
   readonly getProjectPath: () => string | null
   /** The zoom to size a view with, read from its host window (issue #124, C3). */
   readonly getZoomFactor: (window: Pick<PreviewWindowLike, 'webContents'>) => number

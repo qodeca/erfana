@@ -102,6 +102,12 @@ export interface BrowserDownloadsDeps {
   /** The OS save dialog; the chosen path, or `null` when cancelled. */
   readonly showSaveDialog: (parent: unknown, request: SaveDialogRequest) => Promise<string | null>
   readonly showItemInFolder: (path: string) => void
+  /**
+   * Marks a finished file as downloaded from the internet (macOS quarantine,
+   * `downloadQuarantine.ts`), so Gatekeeper checks it on first open. A failure
+   * is logged and the download still counts as done.
+   */
+  readonly markQuarantined?: (path: string) => Promise<void>
   readonly newId?: () => string
 }
 
@@ -274,7 +280,18 @@ export class BrowserDownloads {
         return
       }
     }
+    await this.markQuarantined(target)
     this.notifyDone(tab, target)
+  }
+
+  private async markQuarantined(target: string): Promise<void> {
+    if (this.deps.markQuarantined === undefined) return
+    try {
+      await this.deps.markQuarantined(target)
+    } catch (error) {
+      // Code only: the message names the file
+      logger.warn('A browser download could not be marked as downloaded', { code: String((error as { code?: unknown }).code ?? 'unknown') })
+    }
   }
 
   private notifyDone(tab: DownloadTab, target: string): void {

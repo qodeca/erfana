@@ -1,140 +1,70 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Two consumers of one file across a delete and a restore (#252).
+ * Two consumers of one file across a delete and a restore (#252, #478 S9).
  *
- * The main process counts `start`s per file and drops the whole entry - every
- * count - when it reports the file deleted, or ends the watch with an error
- * flagged `ended`. If a consumer then sent a `stop`
- * for the hold it had before the delete, it would take the count another
- * consumer had just rebuilt, and that tab would go deaf. Here the editor
- * (`useFileWatcher`) and a read-only viewer (`useFileChangeSubscription`)
- * watch the same file against a fake main-side count, and both must end up
- * holding one count each, in either order.
+ * The legacy watch API counted `start`s per path, so one consumer's late
+ * `stop` could take the count another had just rebuilt and leave that tab
+ * deaf. Each tab now holds a subscription of its own (`watchId`), so neither
+ * can release the other's. Here the editor (`useFileWatcher`) and the image
+ * viewer's adapter (`useFileChangeSubscription`) follow the same file: both
+ * must hear the file come back, and closing one must leave the other live.
  *
  * @module fileWatch.twoConsumers.test
- * @see __test__/fileWatchHarness.ts for the shared environment
  */
+import { describe, expect, it } from 'vitest'
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { installImageWatchHarness, openImageTab } from './__test__/fileWatchHarness'
+import { openEditorTab } from './__test__/editorWatchHarness'
 
-import { installFileWatchHarness, renderSubscription } from './__test__/fileWatchHarness'
-import { useFileWatcher } from './useFileWatcher'
-
-const h = installFileWatchHarness()
 const SHARED_PATH = '/proj/notes.md'
+const SETTLED_MS = 3_000
 
-/** The main process's subscriber count for SHARED_PATH. */
-let mainCount = 0
+const h = installImageWatchHarness()
 
-beforeEach(() => {
-  mainCount = 0
-  h.fileWatch.start.mockImplementation(async () => {
-    mainCount += 1
-    return { success: true }
+describe('two consumers of one file', () => {
+  it('both follow the file again after a delete and a restore', async () => {
+    h.disk.write(SHARED_PATH, '# v1\n', { silent: true })
+    const editor = await openEditorTab(h, SHARED_PATH)
+    const viewer = await openImageTab(h, SHARED_PATH)
+
+    h.disk.remove(SHARED_PATH)
+    await h.run(SETTLED_MS)
+    expect(editor.current().isFileDeleted).toBe(true)
+    expect(viewer.hook.result.current.isFileDeleted).toBe(true)
+
+    h.disk.write(SHARED_PATH, '# back\n', { silent: true })
+    await h.run(SETTLED_MS * 4)
+    expect(editor.current().isFileDeleted).toBe(false)
+    expect(viewer.hook.result.current.isFileDeleted).toBe(false)
+
+    h.disk.write(SHARED_PATH, '# after\n')
+    await h.run(SETTLED_MS)
+    expect(editor.buffer()).toBe('# after\n')
+    expect(viewer.shown()).toBe(h.disk.stamp(SHARED_PATH)?.hash)
   })
-  h.fileWatch.stop.mockImplementation(async () => {
-    mainCount = Math.max(0, mainCount - 1)
-    return { success: true }
-  })
-})
 
-/** Main drops the watch, every count with it, then tells the windows. */
-function mainReportsDeleted(): void {
-  mainCount = 0
-  h.emitDeleted(SHARED_PATH)
-}
+  it('closing one leaves the other following, in either order', async () => {
+    for (const closeFirst of ['editor', 'viewer'] as const) {
+      h.disk.write(SHARED_PATH, '# v1\n', { silent: true })
+      const editor = await openEditorTab(h, SHARED_PATH)
+      const viewer = await openImageTab(h, SHARED_PATH)
 
-function renderBoth() {
-  // Stable callback, as a real panel passes: a new one per render would
-  // restart the editor's watch on every state change
-  const onContentUpdate = vi.fn()
-  const editor = renderHook(() =>
-    useFileWatcher({ filePath: SHARED_PATH, hasLocalChanges: false, onContentUpdate })
-  )
-  const viewer = renderSubscription(SHARED_PATH)
-  return { editor, viewer }
-}
+      if (closeFirst === 'editor') editor.hook.unmount()
+      else viewer.hook.unmount()
+      await h.flush()
 
-describe('two consumers of one file, across a delete and a restore', () => {
-  it.each(['editor', 'viewer'] as const)(
-    'both hold a count again when the %s comes back first',
-    async (first) => {
-      const { editor, viewer } = renderBoth()
-      await waitFor(() => expect(mainCount).toBe(2))
-
-      // Genuinely gone: the viewer's re-check agrees, so it shows the banner
-      h.getStats.mockRejectedValue(new Error('ENOENT'))
-      mainReportsDeleted()
-      await waitFor(() => expect(viewer.result.current.isFileDeleted).toBe(true))
-      expect(editor.result.current.isFileDeleted).toBe(true)
-
-      // The editor's save restores the file; the viewer's Reload finds it back
-      h.getStats.mockResolvedValue({ size: 1 })
-      const restoreEditor = async (): Promise<void> => {
-        act(() => editor.result.current.clearDeletedState())
-        await waitFor(() => expect(editor.result.current.isFileDeleted).toBe(false))
-      }
-      const reloadViewer = async (): Promise<void> => {
-        await act(async () => {
-          await viewer.result.current.recover()
-        })
-      }
-      if (first === 'editor') {
-        await restoreEditor()
-        await waitFor(() => expect(mainCount).toBe(1))
-        await reloadViewer()
+      h.disk.write(SHARED_PATH, `# after closing the ${closeFirst}\n`)
+      await h.run(SETTLED_MS)
+      if (closeFirst === 'editor') {
+        expect(viewer.shown()).toBe(h.disk.stamp(SHARED_PATH)?.hash)
+        viewer.hook.unmount()
       } else {
-        await reloadViewer()
-        await restoreEditor()
+        expect(editor.buffer()).toBe(`# after closing the ${closeFirst}\n`)
+        editor.hook.unmount()
       }
-
-      await waitFor(() => expect(mainCount).toBe(2))
-      expect(h.fileWatch.stop).not.toHaveBeenCalled()
-
-      // Closing one tab leaves the other one watched
-      viewer.unmount()
-      await waitFor(() => expect(mainCount).toBe(1))
-      editor.unmount()
-      await waitFor(() => expect(mainCount).toBe(0))
+      await h.flush()
+      expect(h.source.subscriptions.size).toBe(0)
     }
-  )
-
-  it('neither sends a stop for a watch the main process ended with an error', async () => {
-    const { editor, viewer } = renderBoth()
-    await waitFor(() => expect(mainCount).toBe(2))
-
-    // notifyWatchDead: main drops the entry, every count with it, and says so
-    mainCount = 0
-    h.emitError(SHARED_PATH, 'File watch ended: could not re-arm after the file was replaced', true)
-    expect(viewer.result.current.unavailableReason).toBe('watcher-error')
-
-    // The viewer's Reload starts a fresh watch; the editor's close must not take it
-    await act(async () => {
-      await viewer.result.current.recover()
-    })
-    await waitFor(() => expect(mainCount).toBe(1))
-    editor.unmount()
-    await act(async () => {})
-
-    expect(mainCount).toBe(1)
-    expect(h.fileWatch.stop).not.toHaveBeenCalled()
-    viewer.unmount()
-    await waitFor(() => expect(mainCount).toBe(0))
-  })
-
-  it('still releases a live watch after a plain watcher error', async () => {
-    const { viewer } = renderBoth()
-    await waitFor(() => expect(mainCount).toBe(2))
-
-    // A chokidar error the watch survives: main keeps the entry and its counts
-    h.emitError(SHARED_PATH, 'EMFILE')
-    await act(async () => {
-      await viewer.result.current.recover()
-    })
-
-    expect(h.fileWatch.stop).toHaveBeenCalledTimes(1)
-    expect(mainCount).toBe(2)
   })
 })

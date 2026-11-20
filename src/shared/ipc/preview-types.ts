@@ -53,6 +53,12 @@ export type PreviewFailureType =
   | 'frame-too-deep'
   | 'frame-over-limit'
   | 'frame-link-blocked'
+  // The page's own file watch (#478, plan § 3.6): stopped for good, waiting for a slot, unreadable,
+  // on a network or WSL volume (G7)
+  | 'auto-refresh-stopped'
+  | 'watch-limit'
+  | 'file-unreadable'
+  | 'live-refresh-limited'
 
 /** What a producer hands to `PreviewFailureLog.record`; `id`/`timestamp` are added there. */
 export interface PreviewFailureInput {

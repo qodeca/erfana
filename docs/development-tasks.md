@@ -474,7 +474,7 @@ See: [Testing Index](./testing/README.md) | [Test Scenarios](./testing/test-scen
 File and directory watching provides automatic refresh on external changes: single files are watched with chokidar on every platform; the project tree is watched by a native recursive watcher on macOS and Windows and by chokidar on Linux ([File Watching § Watch backends](./file-watching/README.md#watch-backends-211)).
 
 **Test Scenarios:**
-- File content reload (300ms debounce) - modify file externally, expect auto-reload
+- File content reload (75 ms write-finish wait) - modify file externally, expect auto-reload
 - Conflict detection - unsaved changes + external modification shows conflict UI
 - Directory tree refresh (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce) - external file/folder create/delete/rename appear automatically; under a steady stream the refresh is held back at most max(1 s, twice a tree read), capped at 10 s (`DIRECTORY_WATCHER` in `src/renderer/src/components/ProjectTree/constants.ts`)
 - Content-only edits (v0.22.0) - an in-place save, or a temp file renamed over the target, arrives as a `structural: false` batch: git badges update, the tree is **not** re-read ([measurement](./performance/watcher-structural-refresh.md))

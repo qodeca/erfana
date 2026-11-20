@@ -1,160 +1,87 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Lifecycle tests for {@link useFileChangeSubscription}.
- *
- * Covers the subscribe/unsubscribe cycle, the two invariants that make the hook
- * safe for a read-only surface (never pauses, `[filePath]`-only subscription),
- * change delivery and the reload indicator.
- *
- * The other concerns live in sibling files, all sharing one harness:
- * `.degraded` (failure classification and unavailable reasons), `.recovery`
- * (delete re-check and `recover()`), `.slots` (start/stop balance).
+ * The image adapter on the shared freshness tracker (#478, plan S15): the
+ * subscription's life, new bytes for an outside change, no bytes when the
+ * version on screen is still current, and the transient indicator.
  *
  * @module useFileChangeSubscription.test
  * @see __test__/fileWatchHarness.ts for the shared environment
  */
+import { act } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { describe, it, expect, vi } from 'vitest'
-import { act, renderHook, waitFor } from '@testing-library/react'
-
-import { useFileChangeSubscription } from './useFileChangeSubscription'
 import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
-import {
-  installFileWatchHarness,
-  renderSubscription,
-  OTHER_PATH,
-  WATCHED_PATH
-} from './__test__/fileWatchHarness'
+import { WATCHED_PATH, installImageWatchHarness, openImageTab } from './__test__/fileWatchHarness'
 
-const h = installFileWatchHarness()
+/** Past the tracker's throttle and read retries. */
+const SETTLED_MS = 3_000
 
-describe('useFileChangeSubscription', () => {
-  describe('Subscription lifecycle', () => {
-    it('starts the watch on mount and stops it on unmount', async () => {
-      const { unmount } = renderSubscription()
+const h = installImageWatchHarness()
 
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledWith(WATCHED_PATH))
-      expect(h.listenerCounts().changed).toBe(1)
+afterEach(() => {
+  vi.useRealTimers()
+})
 
-      unmount()
+describe('useFileChangeSubscription – lifecycle', () => {
+  it('subscribes once with the image profile, and releases the watch on unmount', async () => {
+    h.disk.write(WATCHED_PATH, 'png-1', { silent: true })
+    const tab = await openImageTab(h)
 
-      // The stop is queued behind the start, so it lands on a later tick.
-      await waitFor(() => expect(h.fileWatch.stop).toHaveBeenCalledWith(WATCHED_PATH))
-      expect(h.listenerCounts()).toEqual({ changed: 0, deleted: 0, error: 0 })
-    })
+    expect(h.source.subscribeCalls).toHaveLength(1)
+    expect(h.source.subscribeCalls[0]).toMatchObject({ filePath: WATCHED_PATH, profile: 'image' })
 
-    it('subscribes to nothing for an empty path', () => {
-      renderSubscription('')
-
-      expect(h.fileWatch.start).not.toHaveBeenCalled()
-    })
-
-    it('swaps the watch exactly once when the path changes', async () => {
-      const { rerender } = renderHook(
-        ({ path }) => useFileChangeSubscription(path, { onExternalChange: vi.fn() }),
-        { initialProps: { path: WATCHED_PATH } }
-      )
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-
-      rerender({ path: OTHER_PATH })
-
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(2))
-      expect(h.fileWatch.stop).toHaveBeenCalledTimes(1)
-      expect(h.fileWatch.stop).toHaveBeenCalledWith(WATCHED_PATH)
-      expect(h.fileWatch.start).toHaveBeenLastCalledWith(OTHER_PATH)
-    })
-
-    it('does not restart the watch when the callback identity changes', async () => {
-      // Invariant 2: the effect depends on [filePath] only.
-      const { rerender } = renderHook(() =>
-        useFileChangeSubscription(WATCHED_PATH, { onExternalChange: () => {} })
-      )
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-
-      rerender()
-      rerender()
-
-      expect(h.fileWatch.start).toHaveBeenCalledTimes(1)
-      expect(h.fileWatch.stop).not.toHaveBeenCalled()
-    })
-
-    it('never pauses or resumes the watch', async () => {
-      // Invariant 1: pause is global per path with no safety timeout, so a
-      // read-only surface must not touch it.
-      const { unmount } = renderSubscription()
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
-
-      h.emitChanged(WATCHED_PATH)
-      h.emitDeleted(WATCHED_PATH)
-      unmount()
-
-      expect(h.fileWatch.pause).not.toHaveBeenCalled()
-      expect(h.fileWatch.resume).not.toHaveBeenCalled()
-    })
+    tab.hook.unmount()
+    await h.flush()
+    expect(h.source.unsubscribeCalls).toEqual([h.source.subscribeCalls[0].watchId])
   })
 
-  describe('Change events', () => {
-    it('reports a change for the watched path', async () => {
-      const onExternalChange = vi.fn()
-      renderSubscription(WATCHED_PATH, onExternalChange)
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
+  it('follows nothing for an empty path or before the first image is on screen', async () => {
+    h.disk.write(WATCHED_PATH, 'png-1', { silent: true })
+    await openImageTab(h, '')
+    await openImageTab(h, WATCHED_PATH, { ready: false })
+    expect(h.source.subscribeCalls).toHaveLength(0)
+  })
+})
 
-      h.emitChanged(WATCHED_PATH)
+describe('useFileChangeSubscription – refresh', () => {
+  it('hands the viewer the new bytes of an outside change, once', async () => {
+    h.disk.write(WATCHED_PATH, 'png-1', { silent: true })
+    const tab = await openImageTab(h)
 
-      expect(onExternalChange).toHaveBeenCalledTimes(1)
-    })
+    h.disk.write(WATCHED_PATH, 'png-2')
+    await h.run(SETTLED_MS)
 
-    it('ignores a change for a different path', async () => {
-      const onExternalChange = vi.fn()
-      renderSubscription(WATCHED_PATH, onExternalChange)
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
-
-      h.emitChanged(OTHER_PATH)
-
-      expect(onExternalChange).not.toHaveBeenCalled()
-    })
-
-    it('always calls the latest callback, even though the effect never re-runs', async () => {
-      const first = vi.fn()
-      const second = vi.fn()
-      const { rerender } = renderHook(
-        ({ cb }) => useFileChangeSubscription(WATCHED_PATH, { onExternalChange: cb }),
-        { initialProps: { cb: first } }
-      )
-      await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
-
-      rerender({ cb: second })
-      h.emitChanged(WATCHED_PATH)
-
-      expect(first).not.toHaveBeenCalled()
-      expect(second).toHaveBeenCalledTimes(1)
-    })
+    expect(tab.onBytes).toHaveBeenCalledTimes(1)
+    expect(tab.shown()).toBe(h.disk.stamp(WATCHED_PATH)?.hash)
+    expect(tab.onBytes.mock.calls[0][0].stamp).toEqual(h.disk.stamp(WATCHED_PATH))
   })
 
-  describe('Reload indicator', () => {
-    it('raises the indicator and clears it after the shared duration', async () => {
-      vi.useFakeTimers()
-      const { result } = renderSubscription()
+  it('reads with the version on screen, and shows nothing new for the same bytes', async () => {
+    h.disk.write(WATCHED_PATH, 'png-1', { silent: true })
+    const tab = await openImageTab(h)
 
-      act(() => result.current.markReloaded())
-      expect(result.current.isReloading).toBe(true)
+    h.disk.touch(WATCHED_PATH)
+    act(() => h.check())
+    await h.run(SETTLED_MS)
 
-      act(() => {
-        vi.advanceTimersByTime(INDICATOR_DURATION_MS)
-      })
-      expect(result.current.isReloading).toBe(false)
+    expect(tab.onBytes).not.toHaveBeenCalled()
+    for (const [request] of h.readImage.mock.calls) {
+      expect(request).toEqual({ filePath: WATCHED_PATH, knownVersion: tab.shown() })
+    }
+  })
+
+  it('raises the indicator for INDICATOR_DURATION_MS when the viewer marks a refresh', async () => {
+    h.disk.write(WATCHED_PATH, 'png-1', { silent: true })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const tab = await openImageTab(h)
+
+    act(() => tab.hook.result.current.markReloaded())
+    expect(tab.hook.result.current.isReloading).toBe(true)
+
+    act(() => {
+      vi.advanceTimersByTime(INDICATOR_DURATION_MS)
     })
-
-    it('clears the timer on unmount so no state update lands after teardown', async () => {
-      vi.useFakeTimers()
-      const { result, unmount } = renderSubscription()
-
-      act(() => result.current.markReloaded())
-      unmount()
-
-      // No act() warning and no throw: the timer was cancelled.
-      expect(() => vi.advanceTimersByTime(INDICATOR_DURATION_MS * 2)).not.toThrow()
-    })
+    expect(tab.hook.result.current.isReloading).toBe(false)
   })
 })

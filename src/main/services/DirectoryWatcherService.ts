@@ -313,7 +313,9 @@ export class DirectoryWatcherService extends DirectoryWatcherEvents {
 
   /**
    * Cleanup directory watchers owned by a specific webContents.
-   * Called when webContents is destroyed (window close or dev refresh).
+   * Called when webContents is destroyed (window close). A reload keeps the
+   * webContents, so this does not run then: the did-navigate project close
+   * (#485, `projectOwnerLifecycle`) stops every directory watch via `stopAll`.
    *
    * @param webContentsId - The ID of the destroyed webContents
    * @remarks

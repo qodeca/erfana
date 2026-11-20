@@ -12,12 +12,15 @@
  * the timers that coalesce changes are manual, so "once" and "nothing" are
  * counted rather than waited for.
  */
-import { lstat, mkdtemp, realpath, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { PREVIEW } from '../../../shared/constants'
+// The pool follows its files through the one watch layer (#478): a real
+// `FileWatcherService` on real chokidar, with no window to send to.
+vi.mock('electron', () => ({ app: undefined, BrowserWindow: { getAllWindows: () => [] } }))
+
 import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
 import type { PreviewLinkScanner } from './PreviewLinkScanWorkerAdapter'
 import { createPreviewReloadPolicy } from './PreviewReloadPolicy'
@@ -25,9 +28,9 @@ import {
   createPreviewWatchCoordinator,
   type IPreviewWatchCoordinator
 } from './PreviewWatchCoordinator'
+import { createMainFreshnessSource } from '../freshness/mainFreshnessSource'
 import { createPreviewWatchPool } from './PreviewWatchPool'
 import { createPreviewLivePipeline } from './previewLivePipeline'
-import { createPreviewWatchBudget } from './previewWatchBudget'
 
 /** chokidar starting on a real file, with Windows Defender's headroom. */
 const TEST_TIMEOUT_MS = 30_000
@@ -105,16 +108,16 @@ async function setUp() {
 
   const timers = manualTimers()
   const held = heldScanner()
-  let stamped!: () => void
-  /** The new watch is listening and has read its file's stamp. */
-  const stampRead = new Promise<void>((resolve) => (stamped = resolve))
+  let live!: () => void
+  /** The new watch's subscribe has answered: it is listening, and its catch-up is decided. */
+  const watchLive = new Promise<void>((resolve) => (live = resolve))
   const pool = createPreviewWatchPool({
-    budget: createPreviewWatchBudget(PREVIEW.MAX_WATCHED_FILES),
-    statFile: async (filePath) => {
-      try {
-        return await lstat(filePath)
-      } finally {
-        stamped()
+    register: () => () => {},
+    createSource: (options) => {
+      const source = createMainFreshnessSource(options)
+      return {
+        ...source,
+        subscribe: (request) => source.subscribe(request).finally(() => live())
       }
     }
   })
@@ -151,7 +154,7 @@ async function setUp() {
     captureWhileVisible: vi.fn(),
     isTornDown: () => false
   })
-  return { style, timers, held, stampRead, pipeline, swap, reloadPage, loadStateChanged }
+  return { style, timers, held, watchLive, pipeline, swap, reloadPage, loadStateChanged }
 }
 
 describe("live pipeline – a save made before the page's files were watched", () => {
@@ -166,8 +169,9 @@ describe("live pipeline – a save made before the page's files were watched", (
       await writeFile(t.style, 'body { background: #445566; }')
       t.held.release()
 
-      await t.stampRead
-      await settle()
+      await t.watchLive
+      // The tracker's catch-up read settles the file first, then reports it once
+      await vi.waitFor(() => expect(t.timers.size).toBe(1), { timeout: TEST_TIMEOUT_MS / 2 })
       expect(t.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
       t.timers.runAll()
       await settle()
@@ -188,7 +192,7 @@ describe("live pipeline – a save made before the page's files were watched", (
       await t.held.scanning
       t.held.release()
 
-      await t.stampRead
+      await t.watchLive
       await settle()
       expect(t.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
       // Nothing was recorded, so nothing is waiting to coalesce.

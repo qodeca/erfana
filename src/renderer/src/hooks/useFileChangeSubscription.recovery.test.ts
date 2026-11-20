@@ -1,260 +1,75 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Deletion and recovery tests for {@link useFileChangeSubscription}.
- *
- * Invariant 3: a delete event is a claim, not a fact. An atomic save is a
- * delete followed by a rename, so the hook re-checks the disk before it tells
- * the user the file is gone – and `recover()` is the manual version of the same
- * re-check.
+ * The image adapter across a delete and a return (#252, #450, #478 plan S15):
+ * a confirmed delete is shown, a file put back clears it by itself with its
+ * new bytes, and Reload reports whether the tab follows its file again.
  *
  * @module useFileChangeSubscription.recovery.test
- * @see __test__/fileWatchHarness.ts for the shared environment
  */
+import { act } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
-import { describe, it, expect, vi } from 'vitest'
-import { act, waitFor } from '@testing-library/react'
+import { WATCHED_PATH, installImageWatchHarness, openImageTab, type ImageTab } from './__test__/fileWatchHarness'
 
-import { DELETED_FILE_PROBE_INTERVAL_MS } from '../../../shared/deletedFileProbe'
-import {
-  installFileWatchHarness,
-  renderSubscription,
-  CAP_ERROR,
-  JOIN_ERROR,
-  WATCHED_PATH
-} from './__test__/fileWatchHarness'
+const SETTLED_MS = 3_000
 
-const h = installFileWatchHarness()
+const h = installImageWatchHarness()
 
-describe('useFileChangeSubscription – deletion', () => {
-  it('believes a delete only after re-checking the disk', async () => {
-    h.getStats.mockRejectedValue(new Error('ENOENT'))
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
+async function deletedTab(): Promise<ImageTab> {
+  h.disk.write(WATCHED_PATH, 'png-1', { silent: true })
+  const tab = await openImageTab(h)
+  h.disk.remove(WATCHED_PATH)
+  await h.run(SETTLED_MS)
+  expect(tab.hook.result.current.isFileDeleted).toBe(true)
+  return tab
+}
 
-    h.emitDeleted(WATCHED_PATH)
+describe('useFileChangeSubscription – delete and recovery', () => {
+  it('a file deleted and put back shows its new bytes and follows again', async () => {
+    const tab = await deletedTab()
 
-    await waitFor(() => expect(result.current.isFileDeleted).toBe(true))
-    expect(h.getStats).toHaveBeenCalledWith({ filePath: WATCHED_PATH })
+    h.disk.write(WATCHED_PATH, 'png-back', { silent: true })
+    await h.run(SETTLED_MS * 4)
+
+    expect(tab.hook.result.current.isFileDeleted).toBe(false)
+    expect(tab.shown()).toBe(h.disk.stamp(WATCHED_PATH)?.hash)
+
+    h.disk.write(WATCHED_PATH, 'png-after')
+    await h.run(SETTLED_MS)
+    expect(tab.shown()).toBe(h.disk.stamp(WATCHED_PATH)?.hash)
   })
 
-  it('recovers and reports a change when the file is actually still there', async () => {
-    // A tmp→rename slower than the main process's 100 ms window.
-    const onExternalChange = vi.fn()
-    const { result } = renderSubscription(WATCHED_PATH, onExternalChange)
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
+  it('a delete that is an atomic save (the file is back at once) is never shown', async () => {
+    h.disk.write(WATCHED_PATH, 'png-1', { silent: true })
+    const tab = await openImageTab(h)
 
-    h.emitDeleted(WATCHED_PATH)
+    h.disk.remove(WATCHED_PATH)
+    h.disk.write(WATCHED_PATH, 'png-2')
+    await h.run(SETTLED_MS)
 
-    await waitFor(() => expect(onExternalChange).toHaveBeenCalledTimes(1))
-    expect(result.current.isFileDeleted).toBe(false)
-    // Main dropped the watch with the delete, so the slot forgot its hold:
-    // the re-start rebuilds the count from zero, and no `stop` goes out that
-    // could take another consumer's count for the same file (#252).
-    expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
-    expect(h.fileWatch.stop).not.toHaveBeenCalled()
+    expect(tab.hook.result.current.isFileDeleted).toBe(false)
+    expect(tab.shown()).toBe(h.disk.stamp(WATCHED_PATH)?.hash)
   })
 
-  it('clears a stale deleted state on the next change event', async () => {
-    h.getStats.mockRejectedValue(new Error('ENOENT'))
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
-    h.emitDeleted(WATCHED_PATH)
-    await waitFor(() => expect(result.current.isFileDeleted).toBe(true))
+  it('Reload resolves false while the file is still gone, true once it is back', async () => {
+    const tab = await deletedTab()
 
-    h.emitChanged(WATCHED_PATH)
-
-    expect(result.current.isFileDeleted).toBe(false)
-  })
-})
-
-describe('useFileChangeSubscription – recover()', () => {
-  it('re-stats, restarts the watch and clears both degraded states', async () => {
-    h.getStats.mockRejectedValueOnce(new Error('ENOENT'))
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-    h.emitDeleted(WATCHED_PATH)
-    await waitFor(() => expect(result.current.isFileDeleted).toBe(true))
-
-    let recovered = false
+    let followed: boolean | undefined
     await act(async () => {
-      recovered = await result.current.recover()
+      const reloading = tab.hook.result.current.reload()
+      await h.clock.run(SETTLED_MS)
+      followed = await reloading
     })
+    expect(followed).toBe(false)
 
-    expect(recovered).toBe(true)
-    expect(result.current.isFileDeleted).toBe(false)
-    expect(result.current.isWatchUnavailable).toBe(false)
-    // After a delete only the acquire talks to main: the hold was forgotten
-    // when main dropped the watch (#252).
-    expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
-    expect(h.fileWatch.stop).not.toHaveBeenCalled()
-  })
-
-  it('releases a live watch before re-acquiring, after a watcher error', async () => {
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-    h.emitError(WATCHED_PATH, 'watcher died')
-
+    h.disk.write(WATCHED_PATH, 'png-back', { silent: true })
     await act(async () => {
-      await result.current.recover()
+      const reloading = tab.hook.result.current.reload()
+      await h.clock.run(SETTLED_MS)
+      followed = await reloading
     })
-
-    // Never two live subscriptions for one consumer
-    expect(h.fileWatch.stop).toHaveBeenCalledTimes(1)
-    expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
-    expect(h.fileWatch.stop.mock.invocationCallOrder[0]).toBeLessThan(
-      h.fileWatch.start.mock.invocationCallOrder[1]
-    )
-  })
-
-  it('stays deleted when the file is still gone', async () => {
-    h.getStats.mockRejectedValue(new Error('ENOENT'))
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-
-    let recovered = true
-    await act(async () => {
-      recovered = await result.current.recover()
-    })
-
-    expect(recovered).toBe(false)
-    expect(result.current.isFileDeleted).toBe(true)
-    // Only the mount call: recover must not start a watch on a missing file.
-    expect(h.fileWatch.start).toHaveBeenCalledTimes(1)
-  })
-
-  it('reports a restart refused by the cap as the limit case', async () => {
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-    h.fileWatch.start.mockResolvedValue({ success: false, error: CAP_ERROR })
-
-    let recovered = true
-    await act(async () => {
-      recovered = await result.current.recover()
-    })
-
-    expect(recovered).toBe(false)
-    expect(result.current.unavailableReason).toBe('limit')
-  })
-
-  it('reports a non-cap restart failure as a watcher error', async () => {
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-    h.fileWatch.start.mockResolvedValue({ success: false, error: JOIN_ERROR })
-
-    await act(async () => {
-      await result.current.recover()
-    })
-
-    expect(result.current.unavailableReason).toBe('watcher-error')
-  })
-
-  it('lets a genuine cap refusal follow a watcher error', async () => {
-    // The failure decides the reason, so a restart the cap really did refuse
-    // still says so - the watcher-error state is not sticky by itself.
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-
-    h.emitError(WATCHED_PATH, 'watcher died')
-    expect(result.current.unavailableReason).toBe('watcher-error')
-
-    h.fileWatch.start.mockResolvedValue({ success: false, error: CAP_ERROR })
-    await act(async () => {
-      await result.current.recover()
-    })
-
-    expect(result.current.unavailableReason).toBe('limit')
-  })
-
-  it('keeps a watcher-error reason instead of blaming the watch limit', async () => {
-    // L4: a failed restart after a watcher fault must not tell the user that
-    // "too many files are open" - that sends them off closing tabs for nothing.
-    const { result } = renderSubscription()
-    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
-
-    h.emitError(WATCHED_PATH, 'watcher died')
-    expect(result.current.unavailableReason).toBe('watcher-error')
-
-    h.fileWatch.start.mockResolvedValue({ success: false, error: 'still broken' })
-    await act(async () => {
-      await result.current.recover()
-    })
-
-    expect(result.current.unavailableReason).toBe('watcher-error')
-  })
-
-  it('is a no-op without a path', async () => {
-    const { result } = renderSubscription('')
-
-    let recovered = true
-    await act(async () => {
-      recovered = await result.current.recover()
-    })
-
-    expect(recovered).toBe(false)
-    expect(h.fileWatch.start).not.toHaveBeenCalled()
-  })
-})
-
-describe('useFileChangeSubscription – a deleted file that comes back (#450)', () => {
-  /** One probe interval passes and everything it started settles. */
-  async function nextProbe(): Promise<void> {
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(DELETED_FILE_PROBE_INTERVAL_MS)
-    })
-  }
-
-  /** Mounted, watching, then deleted for real: the tab shows the deleted state. */
-  async function renderDeleted(onExternalChange = vi.fn()) {
-    vi.useFakeTimers()
-    h.getStats.mockRejectedValue(new Error('ENOENT'))
-    const rendered = renderSubscription(WATCHED_PATH, onExternalChange)
-    await act(async () => {})
-    h.emitDeleted(WATCHED_PATH)
-    await act(async () => {})
-    expect(rendered.result.current.isFileDeleted).toBe(true)
-    h.getStats.mockClear()
-    return rendered
-  }
-
-  it('keeps looking, and keeps the deleted state, while the file stays gone', async () => {
-    const onExternalChange = vi.fn()
-    const { result } = await renderDeleted(onExternalChange)
-
-    await nextProbe()
-    await nextProbe()
-
-    expect(h.getStats).toHaveBeenCalledTimes(2)
-    expect(result.current.isFileDeleted).toBe(true)
-    expect(onExternalChange).not.toHaveBeenCalled()
-    expect(h.fileWatch.start).toHaveBeenCalledTimes(1)
-  })
-
-  it('recovers on its own and reports a change once the file is back, then stops looking', async () => {
-    const onExternalChange = vi.fn()
-    const { result } = await renderDeleted(onExternalChange)
-    await nextProbe()
-
-    h.getStats.mockResolvedValue({ size: 2048 })
-    await nextProbe()
-
-    expect(result.current.isFileDeleted).toBe(false)
-    expect(onExternalChange).toHaveBeenCalledTimes(1)
-    // A fresh watch, and no `stop` for the one main already ended (#252)
-    expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
-    expect(h.fileWatch.stop).not.toHaveBeenCalled()
-
-    const asked = h.getStats.mock.calls.length
-    await nextProbe()
-    expect(h.getStats).toHaveBeenCalledTimes(asked)
-  })
-
-  it('stops looking when the tab closes', async () => {
-    const { unmount } = await renderDeleted()
-
-    unmount()
-    await nextProbe()
-
-    expect(h.getStats).not.toHaveBeenCalled()
+    expect(followed).toBe(true)
+    expect(tab.hook.result.current.isFileDeleted).toBe(false)
   })
 })

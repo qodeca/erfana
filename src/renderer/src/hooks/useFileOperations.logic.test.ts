@@ -15,22 +15,17 @@ import {
   getRelativePath,
   extractParentPath,
   getSiblingNames,
-  createDeleteFileMessage,
-  createDeleteFolderMessage,
   createRenameSuccessMessage,
   stripIpcErrorPrefix,
   isAlreadyExistsError,
   isInvalidFilenameError,
   formatCreateFileError,
   formatCreateFolderError,
-  formatDeleteError,
   isPermissionError,
   isDiskSpaceError,
   isNotFoundError,
   createFileCreationErrorLog,
   createFolderCreationErrorLog,
-  createFileDeletionErrorLog,
-  createFolderDeletionErrorLog,
   createRenameErrorLog,
   buildChildPath,
   requiresConfirmation,
@@ -161,33 +156,6 @@ describe('useFileOperations.logic', () => {
     })
   })
 
-  describe('createDeleteFileMessage', () => {
-    it('should create proper delete file message', () => {
-      expect(createDeleteFileMessage('test.txt')).toBe(
-        'Are you sure you want to delete "test.txt"? This action cannot be undone.'
-      )
-    })
-
-    it('should handle long file names', () => {
-      const message = createDeleteFileMessage('very-long-file-name-here.txt')
-      expect(message).toContain('very-long-file-name-here.txt')
-      expect(message).toContain('cannot be undone')
-    })
-  })
-
-  describe('createDeleteFolderMessage', () => {
-    it('should create proper delete folder message', () => {
-      expect(createDeleteFolderMessage('myfolder')).toBe(
-        'Are you sure you want to delete "myfolder" and all its contents? This action cannot be undone.'
-      )
-    })
-
-    it('should mention "all its contents"', () => {
-      const message = createDeleteFolderMessage('test')
-      expect(message).toContain('all its contents')
-    })
-  })
-
   describe('createRenameSuccessMessage', () => {
     it('should return consistent success message', () => {
       expect(createRenameSuccessMessage()).toBe('Item renamed successfully')
@@ -308,26 +276,6 @@ describe('useFileOperations.logic', () => {
     })
   })
 
-  describe('formatDeleteError', () => {
-    it('should extract message from Error for file', () => {
-      const error = new Error('Permission denied')
-      expect(formatDeleteError(error, 'file')).toBe('Permission denied')
-    })
-
-    it('should extract message from Error for folder', () => {
-      const error = new Error('Folder in use')
-      expect(formatDeleteError(error, 'folder')).toBe('Folder in use')
-    })
-
-    it('should return default for non-Error file', () => {
-      expect(formatDeleteError('error', 'file')).toBe('Failed to delete file')
-    })
-
-    it('should return default for non-Error folder', () => {
-      expect(formatDeleteError(null, 'folder')).toBe('Failed to delete folder')
-    })
-  })
-
   describe('isPermissionError', () => {
     it('should detect EACCES error', () => {
       const error = new Error('EACCES: permission denied')
@@ -403,14 +351,6 @@ describe('useFileOperations.logic', () => {
 
     it('createFolderCreationErrorLog should return consistent message', () => {
       expect(createFolderCreationErrorLog()).toBe('Error creating folder:')
-    })
-
-    it('createFileDeletionErrorLog should return consistent message', () => {
-      expect(createFileDeletionErrorLog()).toBe('Error deleting file:')
-    })
-
-    it('createFolderDeletionErrorLog should return consistent message', () => {
-      expect(createFolderDeletionErrorLog()).toBe('Error deleting folder:')
     })
 
     it('createRenameErrorLog should return consistent message', () => {
@@ -500,21 +440,12 @@ describe('useFileOperations.logic', () => {
     })
 
     it('should handle complete deletion flow logic', () => {
-      const fileName = 'test.txt'
-
-      // Create confirmation message
-      const confirmMessage = createDeleteFileMessage(fileName)
-      expect(confirmMessage).toContain(fileName)
-      expect(confirmMessage).toContain('cannot be undone')
-
       // Check if requires confirmation
       expect(requiresConfirmation('delete')).toBe(true)
 
       // Simulate error
       const error = new Error('EACCES: permission denied')
       expect(isPermissionError(error)).toBe(true)
-      const errorMessage = formatDeleteError(error, 'file')
-      expect(errorMessage).toBe('EACCES: permission denied')
     })
 
     it('should handle complete rename flow logic', () => {

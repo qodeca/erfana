@@ -13,7 +13,7 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { FILE_CHANNELS, FILE_EVENTS } from '../../shared/ipc/file-channels'
 import { TERMINAL_CHANNELS, TERMINAL_EVENTS } from '../../shared/ipc/terminal-channels'
-import type { FileBridge } from '../../shared/ipc/file-schema'
+import type { DeleteEntryResult, FileBridge } from '../../shared/ipc/file-schema'
 import type { TerminalBridge } from '../../shared/ipc/terminal-schema'
 import type { Api } from '../index'
 import { fileBridge } from '../fileBridge'
@@ -63,7 +63,7 @@ describe('Api type', () => {
       path: string
       isSymlink?: boolean
     }>()
-    expectTypeOf<Api['file']['deleteFile']>().returns.resolves.toEqualTypeOf<boolean>()
+    expectTypeOf<Api['file']['deleteFile']>().returns.resolves.toEqualTypeOf<DeleteEntryResult>()
   })
 })
 

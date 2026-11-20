@@ -74,6 +74,33 @@ export class EditorPanelPage {
     return byTestId(this.page, TEST_IDS.EDITOR_PREVIEW)
   }
 
+  /**
+   * Scrolls the rendered preview's scroll container to `top` (px) and returns
+   * where it landed. The container is the preview pane or the first element
+   * inside it that actually scrolls.
+   */
+  async scrollPreviewTo(top: number): Promise<number> {
+    return this.previewPane().evaluate((pane, y) => {
+      const scroller =
+        [pane, ...Array.from(pane.querySelectorAll('*'))].find(
+          (el) => el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY)
+        ) ?? pane
+      scroller.scrollTop = y
+      return scroller.scrollTop
+    }, top)
+  }
+
+  /** The rendered preview's scroll position (px), read as {@link scrollPreviewTo} finds its container. */
+  async previewScrollTop(): Promise<number> {
+    return this.previewPane().evaluate((pane) => {
+      const scroller =
+        [pane, ...Array.from(pane.querySelectorAll('*'))].find(
+          (el) => el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY)
+        ) ?? pane
+      return scroller.scrollTop
+    })
+  }
+
   /** Wait for the panel chrome to mount, whichever view mode it lands in. */
   async waitForReady(): Promise<void> {
     await expect(this.content()).toBeVisible({ timeout: 10_000 })

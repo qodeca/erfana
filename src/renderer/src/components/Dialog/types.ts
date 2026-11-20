@@ -110,6 +110,13 @@ export interface ConfirmDialogConfig extends BaseDialogConfig {
   confirmLabel?: string
   /** Label for cancel button (default: "Cancel") */
   cancelLabel?: string
+  /**
+   * Opt-in click guard: the confirm button ignores clicks (and shows as
+   * `aria-disabled`) for this many ms after the dialog opens, so a double-click
+   * on the button that opened it cannot answer it. For a question that follows
+   * another one in the same place, e.g. "Delete permanently?" (#486).
+   */
+  confirmArmDelayMs?: number
   /** Optional callback when confirmed (deprecated: use Promise return value instead) */
   onConfirm?: () => void | Promise<void>
   /** Optional callback when cancelled (deprecated: use Promise return value instead) */

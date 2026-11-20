@@ -63,7 +63,7 @@ test.describe('Save after the parent folder is renamed outside the app', () => {
 
     // 1. Treated like a delete: "(deleted)" in the tab, the banner in the panel
     await expect(deletedMarker).toBeVisible({ timeout: BUDGET_MS })
-    await expect(page.getByText('This file was deleted on disk. Save to restore it.')).toBeVisible()
+    await expect(page.getByTestId('freshness-notice-deleted')).toBeVisible()
 
     // 2. An edit in this state stays unsaved: autosave holds and does not recreate the folder
     await monaco.appendContent('\nedit after rename\n')
@@ -81,7 +81,7 @@ test.describe('Save after the parent folder is renamed outside the app', () => {
       .toContain('edit after rename')
     expect(await readFile(join(testProject.path, 'docs', 'open.md'), 'utf-8')).toContain('Original body.')
     await expect(deletedMarker).toHaveCount(0)
-    await expect(page.getByText('This file was deleted on disk. Save to restore it.')).toHaveCount(0)
+    await expect(page.getByTestId('freshness-notice-deleted')).toHaveCount(0)
     // The renamed copy is left exactly as the outside rename left it
     expect(await readFile(join(testProject.path, 'docs2', 'open.md'), 'utf-8')).not.toContain(
       'edit after rename'

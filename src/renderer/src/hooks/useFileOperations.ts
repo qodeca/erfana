@@ -3,11 +3,11 @@
 /**
  * useFileOperations Hook
  *
- * Encapsulates all file/folder CRUD operations (create, rename, delete).
+ * Encapsulates the tree toolbar's create and rename operations. Delete lives in
+ * the context-menu commands (`context-menu/deleteCommands.ts`, #486).
  *
  * Responsibilities:
  * - Create new files and folders with dialog prompts
- * - Delete files and folders with confirmation
  * - Rename files and folders with duplicate detection
  * - Integrate with directory watcher pause/resume
  * - Show success/error toast notifications
@@ -29,16 +29,11 @@ import {
   getRelativePath,
   extractParentPath,
   getSiblingNames,
-  createDeleteFileMessage,
-  createDeleteFolderMessage,
   createRenameSuccessMessage,
   formatCreateFileError,
   formatCreateFolderError,
-  formatDeleteError,
   createFileCreationErrorLog,
   createFolderCreationErrorLog,
-  createFileDeletionErrorLog,
-  createFolderDeletionErrorLog,
   createRenameErrorLog
 } from './useFileOperations.logic'
 
@@ -64,7 +59,7 @@ export function useFileOperations(
     onGitRefresh
   } = options
 
-  const { showConfirm, showRename, showNewFile, showNewFolder } = useDialog()
+  const { showRename, showNewFile, showNewFolder } = useDialog()
 
   /**
    * Create a new file in the current selected folder or project root
@@ -163,68 +158,6 @@ export function useFileOperations(
   }
 
   /**
-   * Delete a file with confirmation
-   */
-  const handleDeleteFile = async (filePath: string, fileName: string): Promise<void> => {
-    const confirmed = await showConfirm({
-      title: 'Delete File',
-      message: createDeleteFileMessage(fileName),
-      confirmLabel: 'Delete',
-      danger: true
-    })
-
-    if (!confirmed) return
-
-    try {
-      await withWatcherPause(
-        projectPath,
-        isInternalOperationRef,
-        setFileOperationLoading,
-        async () => {
-          await api.file.deleteFile({ filePath })
-          await refreshProjectTree()
-        }
-      )
-      onGitRefresh?.() // Refresh git status to remove badge
-    } catch (err) {
-      const message = formatDeleteError(err, 'file')
-      showGlobalToast({ type: 'error', title: 'Delete Failed', message })
-      logger.error(createFileDeletionErrorLog(), err instanceof Error ? err : undefined)
-    }
-  }
-
-  /**
-   * Delete a folder (and all contents) with confirmation
-   */
-  const handleDeleteFolder = async (folderPath: string, folderName: string): Promise<void> => {
-    const confirmed = await showConfirm({
-      title: 'Delete Folder',
-      message: createDeleteFolderMessage(folderName),
-      confirmLabel: 'Delete',
-      danger: true
-    })
-
-    if (!confirmed) return
-
-    try {
-      await withWatcherPause(
-        projectPath,
-        isInternalOperationRef,
-        setFileOperationLoading,
-        async () => {
-          await api.file.deleteFolder({ filePath: folderPath })
-          await refreshProjectTree()
-        }
-      )
-      onGitRefresh?.() // Refresh git status to remove badges
-    } catch (err) {
-      const message = formatDeleteError(err, 'folder')
-      showGlobalToast({ type: 'error', title: 'Delete Failed', message })
-      logger.error(createFolderDeletionErrorLog(), err instanceof Error ? err : undefined)
-    }
-  }
-
-  /**
    * Rename a file or folder with duplicate detection
    */
   const handleRename = async (
@@ -285,8 +218,6 @@ export function useFileOperations(
     handleNewFolder,
     handleNewFileInFolder,
     handleNewFolderInFolder,
-    handleDeleteFile,
-    handleDeleteFolder,
     handleRename
   }
 }

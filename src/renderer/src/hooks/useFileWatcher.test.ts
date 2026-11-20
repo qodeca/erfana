@@ -1,843 +1,218 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Tests for useFileWatcher Hook
+ * The editor adapter on the shared freshness tracker (#478, plan S14): the
+ * subscription's life, the editor's update rule (unedited → take the disk's
+ * text; edited → hold the conflict; edited but equal → adopt), the conflict
+ * choices, blocked content (F1) and the save add-on (own echo silent – N1;
+ * a stale autosave → "Not saved" – F16).
  *
- * Tests cover:
- * - isEchoEvent pure function (self-save echo detection)
- * - createFileSaveGuard helper
- * - useFileWatcher hook via renderHook (external change handling, ref-based guards)
- * - reloadFromDisk argument hardening (it doubles as a DOM click handler)
+ * The disk and the watch layer are the core's fakes, installed as the
+ * window's freshness environment; time is the fake clock.
  */
+import { act } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
-import { createFileSaveGuard, isEchoEvent, useFileWatcher } from './useFileWatcher'
+import { installFakeFreshness } from '../services/freshness/__test__/fakeFreshnessEnvironment'
+import { PATH, openEditorTab } from './__test__/editorWatchHarness'
 
-// =========================================================================
-// Mocks
-// =========================================================================
+/** Past the tracker's throttle, delete confirmation and read retries. */
+const SETTLED_MS = 3_000
 
-type FileChangedCallback = (data: { filePath: string }) => void
-type FileDeletedCallback = (data: { filePath: string }) => void
-type FileErrorCallback = (data: { filePath: string; error: string; ended?: boolean }) => void
+const env = installFakeFreshness()
 
-let fileChangedListeners: FileChangedCallback[] = []
-let fileDeletedListeners: FileDeletedCallback[] = []
+describe('useFileWatcher – subscription', () => {
+  it('subscribes once when ready, and releases the watch on unmount', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
 
-const mockFileWatch = {
-  start: vi.fn().mockResolvedValue({ success: true }),
-  stop: vi.fn(),
-  pause: vi.fn().mockResolvedValue(undefined),
-  resume: vi.fn().mockResolvedValue(undefined),
-  onFileChanged: vi.fn((cb: FileChangedCallback) => {
-    fileChangedListeners.push(cb)
-    return () => {
-      fileChangedListeners = fileChangedListeners.filter((l) => l !== cb)
-    }
-  }),
-  onFileDeleted: vi.fn((cb: FileDeletedCallback) => {
-    fileDeletedListeners.push(cb)
-    return () => {
-      fileDeletedListeners = fileDeletedListeners.filter((l) => l !== cb)
-    }
-  }),
-  onFileError: vi.fn((_cb: FileErrorCallback) => vi.fn())
-}
+    expect(env.source.subscribeCalls).toHaveLength(1)
+    expect(env.source.subscribeCalls[0]).toMatchObject({ filePath: PATH, profile: 'editor' })
+    expect(tab.current().state.watch).toEqual({ kind: 'active', live: 'full' })
 
-const mockReadFile = vi.fn<(path: string) => Promise<string>>()
-
-// Set up window.api mock
-Object.defineProperty(window, 'api', {
-  value: {
-    file: {
-      readFile: mockReadFile
-    },
-    fileWatch: mockFileWatch
-  },
-  writable: true,
-  configurable: true
-})
-
-// Emit a simulated file change event from chokidar
-function emitFileChanged(filePath: string): void {
-  for (const listener of fileChangedListeners) {
-    listener({ filePath })
-  }
-}
-
-// Emit a simulated delete: main has ended the watch by the time this arrives
-function emitFileDeleted(filePath: string): void {
-  for (const listener of fileDeletedListeners) {
-    listener({ filePath })
-  }
-}
-
-// =========================================================================
-// isEchoEvent
-// =========================================================================
-
-describe('isEchoEvent', () => {
-  it('should return false when set is empty', () => {
-    expect(isEchoEvent('any content', new Set())).toBe(false)
+    tab.hook.unmount()
+    await env.flush()
+    expect(env.source.unsubscribeCalls).toEqual([env.source.subscribeCalls[0].watchId])
   })
 
-  it('should return true when content matches an entry', () => {
-    expect(isEchoEvent('hello world', new Set(['hello world']))).toBe(true)
-  })
-
-  it('should return false when content differs from all entries', () => {
-    expect(isEchoEvent('hello world', new Set(['hello changed']))).toBe(false)
-  })
-
-  it('should return true when content matches after CRLF normalization', () => {
-    expect(isEchoEvent('line1\r\nline2', new Set(['line1\nline2']))).toBe(true)
-  })
-
-  it('should return true when both have CRLF', () => {
-    expect(isEchoEvent('line1\r\nline2', new Set(['line1\r\nline2']))).toBe(true)
-  })
-
-  it('should return false for empty vs non-empty', () => {
-    expect(isEchoEvent('', new Set(['content']))).toBe(false)
-    expect(isEchoEvent('content', new Set(['']))).toBe(false)
-  })
-
-  it('should return true for both empty', () => {
-    expect(isEchoEvent('', new Set(['']))).toBe(true)
-  })
-
-  it('should match any entry in the set (rapid saves)', () => {
-    const pending = new Set(['save1 content', 'save2 content'])
-    expect(isEchoEvent('save1 content', pending)).toBe(true)
-    expect(isEchoEvent('save2 content', pending)).toBe(true)
-    expect(isEchoEvent('external content', pending)).toBe(false)
+  it('does not subscribe before the initial read is in (ready=false) or with no file', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    await openEditorTab(env, PATH, { ready: false })
+    await openEditorTab(env, PATH, { filePath: null })
+    expect(env.source.subscribeCalls).toHaveLength(0)
   })
 })
 
-// =========================================================================
-// createFileSaveGuard
-// =========================================================================
+describe('useFileWatcher – the editor rule', () => {
+  it('puts an outside change into an unedited tab and flashes the indicator', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
 
-describe('createFileSaveGuard', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+    env.disk.write(PATH, '# v2\r\n')
+    await env.run(SETTLED_MS)
+
+    expect(tab.onContentUpdate).toHaveBeenCalledWith('# v2\r\n', 'crlf')
+    expect(tab.buffer()).toBe('# v2\r\n')
+    expect(tab.current().externalChangeDetected).toBe(false)
   })
 
-  describe('creation', () => {
-    it('should create pause and resume functions', () => {
-      const guard = createFileSaveGuard('/test/file.md')
+  it('holds the conflict for an edited tab, and Keep my version clears it', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
+    tab.type('# mine\n')
 
-      expect(guard.pauseWatch).toBeDefined()
-      expect(guard.resumeWatch).toBeDefined()
-      expect(typeof guard.pauseWatch).toBe('function')
-      expect(typeof guard.resumeWatch).toBe('function')
-    })
+    env.disk.write(PATH, '# theirs\n')
+    await env.run(SETTLED_MS)
+
+    expect(tab.onContentUpdate).not.toHaveBeenCalled()
+    expect(tab.current().externalChangeDetected).toBe(true)
+
+    act(() => tab.current().keepLocal())
+    await env.run(SETTLED_MS)
+    expect(tab.current().externalChangeDetected).toBe(false)
+    expect(tab.buffer()).toBe('# mine\n')
   })
 
-  describe('pauseWatch', () => {
-    it('should call fileWatch.pause with correct path', async () => {
-      const guard = createFileSaveGuard('/test/file.md')
+  it('Reload from disk discards the edits for the disk’s text', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
+    tab.type('# mine\n')
+    env.disk.write(PATH, '# theirs\n')
+    await env.run(SETTLED_MS)
 
-      await guard.pauseWatch()
-
-      expect(mockFileWatch.pause).toHaveBeenCalledTimes(1)
-      expect(mockFileWatch.pause).toHaveBeenCalledWith('/test/file.md')
+    await act(async () => {
+      const reloading = tab.current().reloadFromDisk()
+      await env.clock.run(SETTLED_MS)
+      await reloading
     })
 
-    it('should use the path provided during creation', async () => {
-      const guard1 = createFileSaveGuard('/path/one.md')
-      const guard2 = createFileSaveGuard('/path/two.md')
-
-      await guard1.pauseWatch()
-      await guard2.pauseWatch()
-
-      expect(mockFileWatch.pause).toHaveBeenCalledWith('/path/one.md')
-      expect(mockFileWatch.pause).toHaveBeenCalledWith('/path/two.md')
-    })
+    expect(tab.buffer()).toBe('# theirs\n')
+    expect(tab.current().externalChangeDetected).toBe(false)
   })
 
-  describe('resumeWatch', () => {
-    it('should call fileWatch.resume with correct path', async () => {
-      const guard = createFileSaveGuard('/test/file.md')
+  it('adopts silently when the edited buffer already equals the disk (line endings aside)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
+    tab.type('# same\n')
 
-      await guard.resumeWatch()
+    env.disk.write(PATH, '# same\r\n')
+    await env.run(SETTLED_MS)
 
-      expect(mockFileWatch.resume).toHaveBeenCalledTimes(1)
-      expect(mockFileWatch.resume).toHaveBeenCalledWith('/test/file.md')
-    })
-
-    it('should use the path provided during creation', async () => {
-      const guard1 = createFileSaveGuard('/path/one.md')
-      const guard2 = createFileSaveGuard('/path/two.md')
-
-      await guard1.resumeWatch()
-      await guard2.resumeWatch()
-
-      expect(mockFileWatch.resume).toHaveBeenCalledWith('/path/one.md')
-      expect(mockFileWatch.resume).toHaveBeenCalledWith('/path/two.md')
-    })
+    expect(tab.current().externalChangeDetected).toBe(false)
+    expect(tab.onContentUpdate).not.toHaveBeenCalled()
   })
 
-  describe('usage pattern', () => {
-    it('should support pause-save-resume pattern', async () => {
-      const guard = createFileSaveGuard('/test/file.md')
+  it('shows a confirmed delete, and clears it when the file is back', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
 
-      await guard.pauseWatch()
-      await guard.resumeWatch()
+    env.disk.remove(PATH)
+    await env.run(SETTLED_MS)
+    expect(tab.current().isFileDeleted).toBe(true)
 
-      expect(mockFileWatch.pause).toHaveBeenCalledTimes(1)
-      expect(mockFileWatch.resume).toHaveBeenCalledTimes(1)
-      const pauseCallOrder = mockFileWatch.pause.mock.invocationCallOrder[0]
-      const resumeCallOrder = mockFileWatch.resume.mock.invocationCallOrder[0]
-      expect(pauseCallOrder).toBeLessThan(resumeCallOrder)
-    })
-
-    it('should be reusable for multiple saves', async () => {
-      const guard = createFileSaveGuard('/test/file.md')
-
-      await guard.pauseWatch()
-      await guard.resumeWatch()
-      await guard.pauseWatch()
-      await guard.resumeWatch()
-
-      expect(mockFileWatch.pause).toHaveBeenCalledTimes(2)
-      expect(mockFileWatch.resume).toHaveBeenCalledTimes(2)
-    })
+    env.disk.write(PATH, '# back\n', { silent: true })
+    await env.run(SETTLED_MS * 4)
+    expect(tab.current().isFileDeleted).toBe(false)
+    expect(tab.buffer()).toBe('# back\n')
   })
 
-  describe('edge cases', () => {
-    it('should handle empty file path', async () => {
-      const guard = createFileSaveGuard('')
+  it('makes the tab read-only when the file grows past the limit (F1), with its size', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
 
-      await guard.pauseWatch()
-      await guard.resumeWatch()
+    env.disk.block(PATH, 'too-large')
+    env.disk.write(PATH, '# huge\n')
+    await env.run(SETTLED_MS)
 
-      expect(mockFileWatch.pause).toHaveBeenCalledWith('')
-      expect(mockFileWatch.resume).toHaveBeenCalledWith('')
-    })
-
-    it('should handle paths with special characters', async () => {
-      const specialPath = '/path/with spaces/and-dashes/file (1).md'
-      const guard = createFileSaveGuard(specialPath)
-
-      await guard.pauseWatch()
-
-      expect(mockFileWatch.pause).toHaveBeenCalledWith(specialPath)
-    })
+    expect(tab.current().isReadOnlyBlocked).toBe(true)
+    expect(tab.current().state.content).toEqual({ kind: 'unavailable', reason: 'too-large' })
   })
 })
 
-// =========================================================================
-// useFileWatcher hook
-// =========================================================================
+describe('useFileWatcher – save', () => {
+  it('an autosave sends the stamp it read, and its own echo changes nothing (N1)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
+    tab.type('# typed\n')
 
-describe('useFileWatcher', () => {
-  const TEST_PATH = '/test/file.md'
+    let reply: Awaited<ReturnType<ReturnType<typeof tab.current>['save']>> | undefined
+    await act(async () => {
+      reply = await tab.current().save({ content: '# typed\n', trigger: 'autosave' })
+    })
+    await env.run(SETTLED_MS)
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    // Re-establish mock implementations after clearAllMocks
-    mockFileWatch.start.mockResolvedValue({ success: true })
-    mockFileWatch.pause.mockResolvedValue(undefined)
-    mockFileWatch.resume.mockResolvedValue(undefined)
-    mockFileWatch.onFileChanged.mockImplementation((cb: FileChangedCallback) => {
-      fileChangedListeners.push(cb)
-      return () => {
-        fileChangedListeners = fileChangedListeners.filter((l) => l !== cb)
-      }
-    })
-    mockFileWatch.onFileDeleted.mockImplementation((cb: FileDeletedCallback) => {
-      fileDeletedListeners.push(cb)
-      return () => {
-        fileDeletedListeners = fileDeletedListeners.filter((l) => l !== cb)
-      }
-    })
-    mockFileWatch.onFileError.mockReturnValue(vi.fn())
-    fileChangedListeners = []
-    fileDeletedListeners = []
+    expect(reply?.status).toBe('written')
+    expect(env.source.writeCalls[0].expectedStamp).toBeDefined()
+    expect(env.source.pauseCalls).toHaveLength(1)
+    expect(tab.onContentUpdate).not.toHaveBeenCalled()
+    expect(tab.current().externalChangeDetected).toBe(false)
   })
 
-  function renderFileWatcher(overrides?: {
-    filePath?: string | null
-    hasLocalChanges?: boolean
-    onContentUpdate?: (content: string) => void
-    onReload?: () => void
-  }) {
-    const defaults = {
-      filePath: TEST_PATH,
-      hasLocalChanges: false,
-      onContentUpdate: vi.fn(),
-      onReload: vi.fn(),
-      ...overrides
-    }
-    return {
-      ...renderHook(
-        (props) => useFileWatcher(props),
-        { initialProps: defaults }
-      ),
-      mocks: defaults
-    }
-  }
+  it('an autosave over an outside change writes nothing and holds the "Not saved" conflict (F16)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
+    tab.type('# typed\n')
+    // An outside write the tab has not heard of yet
+    env.source.muted = true
+    env.disk.write(PATH, '# theirs\n')
+    env.source.muted = false
 
-  describe('reloadFromDisk argument hardening', () => {
-    // `reloadFromDisk` is also handed to a button as its click handler, so
-    // React calls it with a synthetic mouse event. Adopting that event as the
-    // file's content crashed the editor panel on the next render. Only a
-    // string may be treated as prefetched content.
-    it('should read from disk when called with a non-string argument', async () => {
-      mockReadFile.mockResolvedValue('# From disk')
-      const onContentUpdate = vi.fn()
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      const clickEvent = { type: 'click', preventDefault: vi.fn() }
-      await act(async () => {
-        await (result.current.reloadFromDisk as (arg?: unknown) => Promise<void>)(clickEvent)
-      })
-
-      expect(mockReadFile).toHaveBeenCalledWith({ filePath: TEST_PATH })
-      expect(onContentUpdate).toHaveBeenCalledWith('# From disk')
-      expect(onContentUpdate).not.toHaveBeenCalledWith(clickEvent)
+    let status: string | undefined
+    await act(async () => {
+      status = (await tab.current().save({ content: '# typed\n', trigger: 'autosave' })).status
     })
+    await env.run(SETTLED_MS)
 
-    it('should use a string argument as prefetched content without reading disk', async () => {
-      const onContentUpdate = vi.fn()
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      await act(async () => {
-        await (result.current.reloadFromDisk as (arg?: unknown) => Promise<void>)('# Prefetched')
-      })
-
-      expect(mockReadFile).not.toHaveBeenCalled()
-      expect(onContentUpdate).toHaveBeenCalledWith('# Prefetched')
-    })
+    expect(status).toBe('changed-on-disk')
+    expect(env.disk.content(PATH)).toBe('# theirs\n')
+    expect(tab.current().state.content).toMatchObject({ kind: 'changed', mode: 'held', notSaved: true })
   })
 
-  describe('notifySaveComplete', () => {
-    it('should expose notifySaveComplete in return value', () => {
-      const { result } = renderFileWatcher()
+  it('an explicit save writes without a stamp check', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
 
-      expect(result.current.notifySaveComplete).toBeDefined()
-      expect(typeof result.current.notifySaveComplete).toBe('function')
+    await act(async () => {
+      await tab.current().save({ content: '# mine\n', trigger: 'explicit' })
     })
+
+    expect(env.source.writeCalls[0].expectedStamp).toBeUndefined()
+    expect(env.disk.content(PATH)).toBe('# mine\n')
   })
 
-  describe('self-save echo detection', () => {
-    it('should ignore file change when disk content matches last saved content', async () => {
-      const onContentUpdate = vi.fn()
-      mockReadFile.mockResolvedValue('saved content')
+  it('writes plainly when the tab is not following yet', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env, PATH, { ready: false })
 
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      // Notify that we just saved this content
-      act(() => {
-        result.current.notifySaveComplete('saved content')
-      })
-
-      // Simulate chokidar event
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      // Wait for async handleExternalChange to complete
-      await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalledWith({ filePath: TEST_PATH })
-      })
-
-      // Should NOT reload – it's our own save echo
-      expect(onContentUpdate).not.toHaveBeenCalled()
-      expect(result.current.externalChangeDetected).toBe(false)
+    await act(async () => {
+      await tab.current().save({ content: '# early\n', trigger: 'autosave' })
     })
 
-    it('should reload when disk content differs from last saved content', async () => {
-      const onContentUpdate = vi.fn()
-      mockReadFile.mockResolvedValue('externally modified content')
+    expect(env.source.writeCalls).toEqual([{ filePath: PATH, content: '# early\n' }])
+    expect(env.source.pauseCalls).toHaveLength(0)
+  })
+})
 
-      const { result } = renderFileWatcher({ onContentUpdate })
+describe('useFileWatcher – catching up', () => {
+  it('a power-resume check finds a change the watch never reported (G8)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
+    env.disk.write(PATH, '# while asleep\n', { silent: true })
 
-      // Notify that we saved different content
-      act(() => {
-        result.current.notifySaveComplete('our saved content')
-      })
+    act(() => env.check())
+    await env.run(SETTLED_MS)
 
-      // Simulate chokidar event
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      // Wait for async handleExternalChange to complete
-      await waitFor(() => {
-        expect(onContentUpdate).toHaveBeenCalledWith('externally modified content')
-      })
-    })
-
-    it('should clear lastSavedContentRef after echo detection', async () => {
-      const onContentUpdate = vi.fn()
-
-      // First call returns saved content (echo), second call returns different content
-      mockReadFile.mockResolvedValueOnce('saved content')
-      mockReadFile.mockResolvedValueOnce('external change')
-
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      // Save and trigger echo
-      act(() => {
-        result.current.notifySaveComplete('saved content')
-      })
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalledTimes(1)
-      })
-
-      // Echo was dropped, content ref should be cleared
-      expect(onContentUpdate).not.toHaveBeenCalled()
-
-      // Second change event – no saved content to compare, should reload
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(onContentUpdate).toHaveBeenCalledWith('external change')
-      })
-    })
-
-    it('should handle CRLF normalization in echo detection', async () => {
-      const onContentUpdate = vi.fn()
-      // Disk has CRLF, we saved with LF
-      mockReadFile.mockResolvedValue('line1\r\nline2')
-
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      act(() => {
-        result.current.notifySaveComplete('line1\nline2')
-      })
-
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalled()
-      })
-
-      // Should be treated as echo despite line ending difference
-      expect(onContentUpdate).not.toHaveBeenCalled()
-    })
-
-    it('should handle rapid successive saves (two saves before first echo)', async () => {
-      const onContentUpdate = vi.fn()
-
-      // First echo returns save1 content, second echo returns save2 content
-      mockReadFile.mockResolvedValueOnce('save1 content')
-      mockReadFile.mockResolvedValueOnce('save2 content')
-
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      // Two rapid saves – both stored in the Set
-      act(() => {
-        result.current.notifySaveComplete('save1 content')
-        result.current.notifySaveComplete('save2 content')
-      })
-
-      // First echo arrives (from save1)
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalledTimes(1)
-      })
-
-      // First echo should be suppressed
-      expect(onContentUpdate).not.toHaveBeenCalled()
-
-      // Second echo arrives (from save2)
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalledTimes(2)
-      })
-
-      // Second echo should also be suppressed
-      expect(onContentUpdate).not.toHaveBeenCalled()
-    })
+    expect(tab.buffer()).toBe('# while asleep\n')
   })
 
-  describe('external change with hasLocalChanges ref', () => {
-    it('should show conflict when hasLocalChanges is true and content differs', async () => {
-      mockReadFile.mockResolvedValue('external content')
-
-      const { result } = renderFileWatcher({ hasLocalChanges: true })
-
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(result.current.externalChangeDetected).toBe(true)
-      })
-    })
-
-    it('should auto-reload when hasLocalChanges is false and content differs', async () => {
-      const onContentUpdate = vi.fn()
-      mockReadFile.mockResolvedValue('external content')
-
-      const { result } = renderFileWatcher({
-        hasLocalChanges: false,
-        onContentUpdate
-      })
-
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(onContentUpdate).toHaveBeenCalledWith('external content')
-      })
-
-      expect(result.current.externalChangeDetected).toBe(false)
-    })
-
-    it('should use ref value when hasLocalChanges prop changes after mount', async () => {
-      mockReadFile.mockResolvedValue('external content')
-
-      const { result, rerender, mocks } = renderFileWatcher({ hasLocalChanges: false })
-
-      // Change hasLocalChanges to true via rerender
-      rerender({ ...mocks, hasLocalChanges: true })
-
-      // Now trigger a change event – should show conflict because ref is updated
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(result.current.externalChangeDetected).toBe(true)
-      })
-    })
-  })
-
-  describe('isSavingRef guard', () => {
-    it('should ignore change events while saving', async () => {
-      const onContentUpdate = vi.fn()
-      mockReadFile.mockResolvedValue('external content')
-
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      // Mark as saving
-      act(() => {
-        result.current.markSaving()
-      })
-
-      // Trigger change event – should be ignored (returns early before readFile)
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      // isSavingRef guard returns early before any async call
-      expect(mockReadFile).not.toHaveBeenCalled()
-      expect(onContentUpdate).not.toHaveBeenCalled()
-    })
-
-    it('should process events after unmarkSaving', async () => {
-      const onContentUpdate = vi.fn()
-      mockReadFile.mockResolvedValue('external content')
-
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      // Mark as saving, then unmark
-      act(() => {
-        result.current.markSaving()
-        result.current.unmarkSaving()
-      })
-
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(onContentUpdate).toHaveBeenCalledWith('external content')
-      })
-    })
-  })
-
-  describe('lastSavedContentRef lifecycle', () => {
-    it('should clear on keepLocal', async () => {
-      const onContentUpdate = vi.fn()
-      mockReadFile.mockResolvedValue('new external content')
-
-      const { result } = renderFileWatcher({ hasLocalChanges: true, onContentUpdate })
-
-      // Save some content
-      act(() => {
-        result.current.notifySaveComplete('our content')
-      })
-
-      // Keep local version (clears lastSavedContentRef)
-      act(() => {
-        result.current.keepLocal()
-      })
-
-      // Next change event should not find any saved content to compare
-      // Since hasLocalChanges is true, should show conflict
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(result.current.externalChangeDetected).toBe(true)
-      })
-    })
-
-    it('should clear on reloadFromDisk', async () => {
-      const onContentUpdate = vi.fn()
-      mockReadFile.mockResolvedValue('reloaded content')
-
-      const { result } = renderFileWatcher({ onContentUpdate })
-
-      // Save content
-      act(() => {
-        result.current.notifySaveComplete('our content')
-      })
-
-      // Trigger external change that causes reload
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(onContentUpdate).toHaveBeenCalledWith('reloaded content')
-      })
-
-      // After reload, lastSavedContentRef should be null
-      // Next change with same content should NOT be treated as echo
-      mockReadFile.mockResolvedValue('reloaded content')
-      onContentUpdate.mockClear()
-
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        // Should reload again since lastSavedContentRef was cleared
-        expect(onContentUpdate).toHaveBeenCalledWith('reloaded content')
-      })
-    })
-
-    it('should clear on file path change', async () => {
-      const { result, rerender, mocks } = renderFileWatcher()
-
-      act(() => {
-        result.current.notifySaveComplete('saved for file A')
-      })
-
-      // Change file path – should clear lastSavedContentRef via effect cleanup
-      rerender({ ...mocks, filePath: '/other/file.md' })
-
-      // The saved content from the old file should not affect the new file
-      const onContentUpdate = mocks.onContentUpdate
-      mockReadFile.mockResolvedValue('saved for file A')
-
-      act(() => {
-        emitFileChanged('/other/file.md')
-      })
-
-      await waitFor(() => {
-        // Should reload, not treat as echo (lastSavedContentRef was cleared)
-        expect(onContentUpdate).toHaveBeenCalledWith('saved for file A')
-      })
-    })
-  })
-
-  describe('error handling', () => {
-    it('should fall back to ref-based decision when readFile fails', async () => {
-      mockReadFile.mockRejectedValue(new Error('ENOENT'))
-
-      const { result } = renderFileWatcher({ hasLocalChanges: true })
-
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(result.current.externalChangeDetected).toBe(true)
-      })
-    })
-
-    it('should auto-reload on readFile failure with no local changes', async () => {
-      const onContentUpdate = vi.fn()
-      // First call fails (in handleExternalChange), second succeeds (in reloadFromDisk fallback)
-      mockReadFile.mockRejectedValueOnce(new Error('ENOENT'))
-      mockReadFile.mockResolvedValueOnce('recovered content')
-
-      renderFileWatcher({ hasLocalChanges: false, onContentUpdate })
-
-      act(() => {
-        emitFileChanged(TEST_PATH)
-      })
-
-      await waitFor(() => {
-        expect(onContentUpdate).toHaveBeenCalledWith('recovered content')
-      })
-    })
-  })
-
-  describe('events for different files are ignored', () => {
-    it('should ignore change events for other file paths', async () => {
-      const onContentUpdate = vi.fn()
-
-      renderFileWatcher({ onContentUpdate })
-
-      act(() => {
-        emitFileChanged('/other/file.md')
-      })
-
-      // Event for a different file is filtered at the listener level (not our file)
-      expect(mockReadFile).not.toHaveBeenCalled()
-      expect(onContentUpdate).not.toHaveBeenCalled()
-    })
-  })
-
-  // #252: the main process ends a watch when its file is deleted, so a tab a
-  // save restored stayed deaf to outside edits until it was reopened
-  describe('watching a restored file again', () => {
-    async function renderWatching() {
-      const rendered = renderFileWatcher()
-      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(1))
-      return rendered
-    }
-
-    it('starts a new watch once a save restores a file deleted on disk', async () => {
-      const { result } = await renderWatching()
-      act(() => {
-        emitFileDeleted(TEST_PATH)
-      })
-      expect(result.current.isFileDeleted).toBe(true)
-
-      act(() => {
-        result.current.clearDeletedState()
-      })
-
-      expect(result.current.isFileDeleted).toBe(false)
-      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
-      // Main dropped the old watch with the delete: a `stop` now could take
-      // another consumer's count for the same file
-      expect(mockFileWatch.stop).not.toHaveBeenCalled()
-    })
-
-    it('starts a new watch when a deleted file is reloaded from disk', async () => {
-      const { result } = await renderWatching()
-      act(() => {
-        emitFileDeleted(TEST_PATH)
-      })
-      mockReadFile.mockResolvedValueOnce('# back')
-
-      await act(async () => {
-        await result.current.reloadFromDisk()
-      })
-
-      expect(result.current.isFileDeleted).toBe(false)
-      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
-      expect(mockFileWatch.stop).not.toHaveBeenCalled()
-    })
-
-    it('sends no stop on unmount for a watch main ended with an error (#252)', async () => {
-      let emitError: FileErrorCallback = () => {}
-      mockFileWatch.onFileError.mockImplementation((cb: FileErrorCallback) => {
-        emitError = cb
-        return vi.fn()
-      })
-      const { unmount } = await renderWatching()
-
-      act(() => {
-        emitError({ filePath: TEST_PATH, error: 'File watch ended: could not re-arm', ended: true })
-      })
-      unmount()
-      await act(async () => {})
-
-      expect(mockFileWatch.stop).not.toHaveBeenCalled()
-    })
-
-    it('still sends its stop after a plain watcher error the watch survived', async () => {
-      let emitError: FileErrorCallback = () => {}
-      mockFileWatch.onFileError.mockImplementation((cb: FileErrorCallback) => {
-        emitError = cb
-        return vi.fn()
-      })
-      const { unmount } = await renderWatching()
-
-      act(() => {
-        emitError({ filePath: TEST_PATH, error: 'EMFILE' })
-      })
-      unmount()
-
-      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(1))
-    })
-
-    it('sends no stop on unmount for a watch the delete already ended', async () => {
-      const { unmount } = await renderWatching()
-      act(() => {
-        emitFileDeleted(TEST_PATH)
-      })
-
-      unmount()
-      await act(async () => {})
-
-      expect(mockFileWatch.stop).not.toHaveBeenCalled()
-    })
-
-    it('leaves a live watch alone after an ordinary save', async () => {
-      const { result } = await renderWatching()
-
-      act(() => {
-        result.current.clearDeletedState()
-      })
-      await act(async () => {})
-
-      expect(mockFileWatch.start).toHaveBeenCalledTimes(1)
-      expect(mockFileWatch.stop).not.toHaveBeenCalled()
-    })
-
-    it('restarts the watch once per restore, not on every later save', async () => {
-      const { result } = await renderWatching()
-      act(() => {
-        emitFileDeleted(TEST_PATH)
-      })
-      act(() => {
-        result.current.clearDeletedState()
-      })
-      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
-
-      act(() => {
-        result.current.clearDeletedState()
-      })
-      await act(async () => {})
-
-      expect(mockFileWatch.start).toHaveBeenCalledTimes(2)
-    })
-
-    it('ends the restarted watch on unmount', async () => {
-      const { result, unmount } = await renderWatching()
-      act(() => {
-        emitFileDeleted(TEST_PATH)
-      })
-      act(() => {
-        result.current.clearDeletedState()
-      })
-      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
-
-      unmount()
-
-      // One stop for the one live watch: the ended one sends none
-      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(1))
-      await act(async () => {})
-      expect(mockFileWatch.stop).toHaveBeenCalledTimes(1)
-    })
+  it('a comment save elsewhere (reloadIfUnedited) brings the text in', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
+    env.disk.write(PATH, '# with comment\n', { silent: true })
+
+    act(() => tab.current().reloadIfUnedited())
+    await env.run(SETTLED_MS)
+
+    expect(tab.buffer()).toBe('# with comment\n')
   })
 })

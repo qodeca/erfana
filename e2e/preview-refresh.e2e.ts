@@ -43,9 +43,12 @@ import { test, expect } from './fixtures/index'
 import { ImageViewerPage } from './pages/image-viewer.page'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import {
-  VIEWER_BANNER_COPY,
   VIEWER_STATUS_COPY
 } from '../src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic'
+import {
+  FRESHNESS_NOTICE_COPY,
+  FRESHNESS_NOTICE_TEST_IDS
+} from '../src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy'
 
 // =============================================================================
 // Constants and helpers
@@ -367,16 +370,16 @@ test.describe('Deleted file', () => {
     await fs.promises.rm(path.join(testProject.path, IMAGE_NAME))
 
     await viewer.expectBanner('deleted')
-    await expect(viewer.banner()).toHaveText(new RegExp(escapeRegExp(VIEWER_BANNER_COPY.deleted)))
+    await expect(viewer.banner()).toHaveText(new RegExp(escapeRegExp(FRESHNESS_NOTICE_COPY.deleted(IMAGE_NAME))))
     // The tab is not closed and the pixels are not thrown away: the last
     // version that was loaded stays on screen.
     await expect(viewer.image()).toBeVisible()
     expect(await viewer.marker()).toBe('v1')
 
-    // Reload while the file is still gone: nothing to read, and it says so.
-    await viewer.clickReload()
-    await expect(viewer.statusSlot()).toHaveText(VIEWER_STATUS_COPY.reloadFailedMissing)
-    await viewer.expectBanner('deleted')
+    // The deleted notice offers Close tab and no Reload: there is nothing to
+    // read until the file is back (#478 F14).
+    await expect(viewer.banner().getByTestId(FRESHNESS_NOTICE_TEST_IDS.close)).toBeVisible()
+    await expect(viewer.reloadButton()).toHaveCount(0)
 
     // A genuine delete drops the main-process watch, so the tab looks for the
     // file itself and recovers once it is back (#450) – no Reload needed. A

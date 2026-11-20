@@ -14,7 +14,6 @@
  */
 import path from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WebContents } from 'electron'
 
 const harness = vi.hoisted(() => ({
   sends: [] as Array<{ channel: string; payload: Record<string, unknown> }>,
@@ -31,6 +30,11 @@ vi.mock('chokidar', () => {
     const watcher = {
       on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
         handlers.set(event, listener)
+        return watcher
+      }),
+      // Says `ready` at once: a subscribe answers after it (#478 G3)
+      once: vi.fn((event: string, listener: () => void) => {
+        if (event === 'ready') queueMicrotask(listener)
         return watcher
       }),
       close: vi.fn(async () => {})
@@ -83,15 +87,18 @@ vi.mock('./LoggingService', () => ({ logger: harness.logger }))
 import chokidar from 'chokidar'
 import { FileWatcherService } from './FileWatcherService'
 import { UNREADABLE_RECHECK_MS } from './watcher/pathPresence'
+import { testSession, type TestSession } from './watcher/__test__/testSession'
+import { WindowWatches } from './watcher/__test__/windowWatches'
 
 const ROOT = path.resolve(path.sep, 'work', 'proj')
 const FILE = path.join(ROOT, 'docs', 'open.md')
-const webContents = { id: 1 } as unknown as WebContents
 /** The atomic-save window before the detector asks the disk. */
 const DETECTOR_DELAY_MS = 100
 const HOST_PLATFORM = process.platform
 
 let fws: FileWatcherService
+let session: TestSession
+let w: WindowWatches
 
 beforeEach(async () => {
   vi.useFakeTimers()
@@ -102,9 +109,10 @@ beforeEach(async () => {
   harness.disk.set(FILE, 'present')
   vi.mocked(chokidar.watch).mockClear()
 
-  fws = new FileWatcherService()
-  fws.setProjectPath(ROOT)
-  await fws.watchFile(FILE, webContents)
+  session = testSession(ROOT)
+  fws = new FileWatcherService({ session, stampFile: async () => ({ size: 1, mtimeMs: 1, ctimeMs: 1, ino: '1' }) })
+  w = new WindowWatches(fws, harness.sends)
+  await w.started(FILE)
   harness.sends.length = 0
 })
 
@@ -125,23 +133,24 @@ describe('a path watched again during the old watch’s unlink re-check', () => 
 
     // Inside that wait: the same project is closed and reopened, and the file,
     // back on disk, is watched again
-    await fws.stopAll()
-    fws.setProjectPath(ROOT)
+    await fws.suspendAll()
+    await fws.endSuspended(session.switchTo(ROOT))
     harness.disk.set(FILE, 'present')
-    await fws.watchFile(FILE, webContents)
+    await w.started(FILE)
     expect(chokidar.watch).toHaveBeenCalledTimes(2)
 
     await vi.advanceTimersByTimeAsync(UNREADABLE_RECHECK_MS * 4)
 
-    // The old watch's verdict reached nobody, and nothing re-armed it
-    expect(harness.sends.filter(s => s.channel === 'file-watch:error')).toEqual([])
-    expect(harness.sends.filter(s => s.channel === 'file-watch:deleted')).toEqual([])
+    // The old watch's verdict reached nobody, and nothing re-armed it: the old
+    // subscription heard only that the project switch ended it
+    expect(w.events().map(e => [e.kind, e.reason])).toEqual([['ended', 'project-switch']])
     expect(chokidar.watch).toHaveBeenCalledTimes(2)
 
     // The new watch is still held and still reports a change
     expect(fws.getStats().totalWatched).toBe(1)
     harness.fileWatchers[1].handlers.get('change')?.()
     await vi.advanceTimersByTimeAsync(1_000)
-    expect(harness.sends).toEqual([{ channel: 'file-watch:changed', payload: { filePath: FILE } }])
+    expect(w.kinds()).toEqual(['ended', 'changed'])
+    expect(w.to(FILE, 'changed')).toEqual([1])
   })
 })

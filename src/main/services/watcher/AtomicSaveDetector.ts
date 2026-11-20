@@ -13,15 +13,21 @@
  * Without detection, this appears as DELETE + CREATE, not UPDATE.
  *
  * Solution: Wait 100ms after DELETE. If file reappears, emit CHANGE instead.
+ *
+ * With `lookAtOnce` (the watch layer's detector, #478 plan decision 26) the
+ * file is looked for at once first: an atomic save whose rename already landed
+ * is reported without waiting, and the window is only waited when the file is
+ * not there yet.
  */
 
-import { isPresentAfterSettle } from './pathPresence'
+import { isPresentAfterSettle, probePath } from './pathPresence'
 
 export type AtomicSaveCallback = (path: string, wasAtomicSave: boolean) => void
 
 interface PendingDelete {
   path: string
-  timer: NodeJS.Timeout
+  /** `null` while the at-once look runs. */
+  timer: NodeJS.Timeout | null
   callback: AtomicSaveCallback
   /**
    * This registration's identity. The entry stays in the map until its
@@ -34,9 +40,20 @@ interface PendingDelete {
 // VS Code uses 100ms delay for atomic save detection
 const ATOMIC_SAVE_DELAY_MS = 100
 
+/** How a detector decides. */
+export interface AtomicSaveDetectorOptions {
+  /** Look for the file at once before waiting the window (decision 26). */
+  lookAtOnce?: boolean
+}
+
 export class AtomicSaveDetector {
   private pendingDeletes: Map<string, PendingDelete> = new Map()
   private isDisposed = false
+  private readonly lookAtOnce: boolean
+
+  constructor(options: AtomicSaveDetectorOptions = {}) {
+    this.lookAtOnce = options.lookAtOnce ?? false
+  }
 
   /**
    * Register a delete event for atomic save detection
@@ -52,18 +69,36 @@ export class AtomicSaveDetector {
     // Cancel any existing pending delete for this path
     this.cancelPending(filePath)
 
-    // Schedule check after delay
-    const token = Symbol(filePath)
-    const timer = setTimeout(() => {
-      void this.settle(filePath, token, callback)
-    }, ATOMIC_SAVE_DELAY_MS)
+    const pending: PendingDelete = { path: filePath, timer: null, callback, token: Symbol(filePath) }
+    this.pendingDeletes.set(filePath, pending)
+    if (this.lookAtOnce) {
+      void this.lookNow(pending)
+    } else {
+      this.startWindow(pending)
+    }
+  }
 
-    this.pendingDeletes.set(filePath, {
-      path: filePath,
-      timer,
-      callback,
-      token
-    })
+  /** Schedule the check after the window. */
+  private startWindow(pending: PendingDelete): void {
+    pending.timer = setTimeout(() => {
+      void this.settle(pending.path, pending.token, pending.callback)
+    }, ATOMIC_SAVE_DELAY_MS)
+  }
+
+  /**
+   * The at-once look: a file that is there now is an atomic save, reported
+   * without waiting. Anything else – gone, or unreadable, which on Windows may
+   * be a delete pending – waits the window and its settled check.
+   */
+  private async lookNow(pending: PendingDelete): Promise<void> {
+    const presence = await probePath(pending.path)
+    if (!this.isCurrent(pending.path, pending.token)) return
+    if (presence === 'present') {
+      this.pendingDeletes.delete(pending.path)
+      pending.callback(pending.path, true)
+      return
+    }
+    this.startWindow(pending)
   }
 
   /**
@@ -109,7 +144,7 @@ export class AtomicSaveDetector {
   cancelPending(filePath: string): void {
     const pending = this.pendingDeletes.get(filePath)
     if (pending) {
-      clearTimeout(pending.timer)
+      if (pending.timer) clearTimeout(pending.timer)
       this.pendingDeletes.delete(filePath)
     }
   }
@@ -119,7 +154,7 @@ export class AtomicSaveDetector {
    */
   cancelAll(): void {
     for (const [, pending] of this.pendingDeletes) {
-      clearTimeout(pending.timer)
+      if (pending.timer) clearTimeout(pending.timer)
     }
     this.pendingDeletes.clear()
   }
@@ -152,8 +187,8 @@ export class AtomicSaveDetector {
 }
 
 /**
- * Factory function for creating detector instances
+ * The watch layer's detector: it looks for the file at once (decision 26).
  */
 export function createAtomicSaveDetector(): AtomicSaveDetector {
-  return new AtomicSaveDetector()
+  return new AtomicSaveDetector({ lookAtOnce: true })
 }

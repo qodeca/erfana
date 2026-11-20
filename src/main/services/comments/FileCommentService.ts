@@ -19,7 +19,7 @@
  *   with the pick, it also says whether the pick sits in a generated region
  *   (W-08), from main's own parse.
  * - **release** forgets a closed panel of the sender's window and ends its
- *   watch, so closed tabs do not hold the 64-watch budget.
+ *   watch, so closed tabs do not hold a slot of the `comments` watch bucket.
  * - **save** resolves the token or the keys against the sender's panel and
  *   runs the one shared `CommentWriter`, with this family's kinds. The writer
  *   refuses while ANY window's editor holds unsaved edits for the file, asks
@@ -104,9 +104,8 @@ export interface FileCommentServiceDeps {
   readonly isKindEnabled?: (kind: CommentFileKind) => boolean
   /** A kind's own write-job fields from the app settings (Markdown's `breaks`), read per save. */
   readonly writeOptions?: CommentWriterDeps['writeOptions']
-  /** Start a watch; the atomic-save-proof single-file watcher by default. */
+  /** Start a watch; a freshness tracker on the shared watch layer by default (`comments` bucket). */
   readonly watch?: FileCommentWatchFactory
-  readonly watchMax?: number
   readonly keys?: CommentKeyStoreDeps
   readonly now?: () => Date
   readonly platform?: NodeJS.Platform
@@ -154,8 +153,7 @@ export class FileCommentService {
     this.panels = new FileCommentPanels(deps.keys)
     this.watches = createFileCommentWatches({
       watch: deps.watch ?? defaultFileCommentWatch,
-      onChange: realPath => this.changed(realPath),
-      ...(deps.watchMax === undefined ? {} : { max: deps.watchMax })
+      onChange: realPath => this.changed(realPath)
     })
     this.writer = new CommentWriter({
       identity: deps.identity,

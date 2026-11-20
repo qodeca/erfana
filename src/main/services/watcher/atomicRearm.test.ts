@@ -5,112 +5,76 @@
  *
  * `atomicRearm`'s module doc claims the {@link AtomicRearmDeps} seam exists so
  * this branch can be exercised without a chokidar instance. This file is that
- * claim: a hand-built port, fake watcher objects, and a real temp file so the
- * existence checks answer honestly. `FileWatcherService.atomicSave.test.ts`
- * covers the same branch wired to the service; this one pins the branch itself,
- * including the two states the service cannot easily produce (a port that
- * refuses the swap, a `createWatcher` that throws).
+ * claim: a hand-built port whose `rearm` answers as scripted, and a real temp
+ * file so the existence checks answer honestly. The re-arm itself (close
+ * before create, confinement, one arm at a time) is `armWatch.test.ts`;
+ * `FileWatcherService.atomicSave.test.ts` covers the branch wired to the
+ * service.
  */
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
-import type { FSWatcher } from 'chokidar'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import {
-  resolveDeletedWatch,
-  WATCH_DEAD_OUTSIDE_PROJECT,
-  WATCH_DEAD_REARM_FAILED,
-  WATCH_DEAD_SESSION_ENDED,
-  type AtomicRearmDeps,
-  type RearmableWatch
-} from './atomicRearm'
-
-interface FakeWatcher {
-  close: Mock
-}
-
-const makeWatcher = (onClose?: () => void): FakeWatcher => ({
-  close: vi.fn(async () => {
-    onClose?.()
-  })
-})
-
-const asFsWatcher = (watcher: FakeWatcher): FSWatcher => watcher as unknown as FSWatcher
+import { resolveDeletedWatch, type AtomicRearmDeps } from './atomicRearm'
+import type { ArmOutcome, WatchEntry } from './watchTypes'
+import type { WatchEndReason } from '../../../shared/freshness/freshnessTypes'
 
 interface Harness {
   deps: AtomicRearmDeps
   /** Every port call in order, so ordering claims can be asserted. */
   events: string[]
-  createdWatchers: FakeWatcher[]
-  deadReasons: string[]
-  firstWatcher: FakeWatcher
-  record: RearmableWatch
+  deadReasons: WatchEndReason[]
+  entry: WatchEntry
   state: {
-    held: RearmableWatch | undefined
-    version: number
+    held: WatchEntry | undefined
     disposing: boolean
-    confined: boolean
-    createThrows: boolean
-    acceptReplacement: boolean
+    outcome: ArmOutcome
+    /** Runs inside `rearm`, after the outcome is decided. */
+    duringRearm: () => void
   }
 }
 
 function createHarness(filePath: string): Harness {
   const events: string[] = []
-  const createdWatchers: FakeWatcher[] = []
-  const deadReasons: string[] = []
-
-  const firstWatcher = makeWatcher(() => events.push('close-stale'))
-  const record: RearmableWatch = {
+  const deadReasons: WatchEndReason[] = []
+  const entry: WatchEntry = {
+    key: filePath,
     filePath,
-    watcher: asFsWatcher(firstWatcher),
-    version: 1,
-    debounceTimer: null
+    profile: 'editor',
+    watcher: null,
+    suspended: false,
+    identity: null,
+    arming: null,
+    ready: null,
+    subs: new Set()
   }
-
   const state = {
-    held: record as RearmableWatch | undefined,
-    version: 1,
+    held: entry as WatchEntry | undefined,
     disposing: false,
-    confined: true,
-    createThrows: false,
-    acceptReplacement: true
+    outcome: 'armed' as ArmOutcome,
+    duringRearm: () => {}
   }
-
   const deps: AtomicRearmDeps = {
     isDisposing: () => state.disposing,
-    currentVersion: () => state.version,
-    getWatch: path => (path === filePath ? state.held : undefined),
-    isPathConfined: async () => state.confined,
-    createWatcher: () => {
-      if (state.createThrows) {
-        throw new Error('EMFILE: too many open files')
-      }
-      const watcher = makeWatcher(() => events.push('close-replacement'))
-      createdWatchers.push(watcher)
-      events.push('create')
-      return asFsWatcher(watcher)
-    },
-    replaceWatcher: (path, watcher) => {
-      if (!state.acceptReplacement || path !== filePath || !state.held) return false
-      state.held.watcher = watcher
-      events.push('replace')
-      return true
+    getWatch: key => (key === filePath ? state.held : undefined),
+    rearm: async () => {
+      events.push('rearm')
+      state.duringRearm()
+      return state.outcome
     },
     discardWatch: () => {
       events.push('discard')
       state.held = undefined
     },
     notifyDeleted: () => events.push('deleted'),
-    notifyWatchDead: (_path, reason) => {
+    notifyWatchDead: (_entry, reason) => {
       events.push('dead')
       deadReasons.push(reason)
     },
     emitChange: () => events.push('change'),
     log: () => {}
   }
-
-  return { deps, events, createdWatchers, deadReasons, firstWatcher, record, state }
+  return { deps, events, deadReasons, entry, state }
 }
 
 let dir: string
@@ -132,53 +96,44 @@ afterEach(() => {
 })
 
 describe('resolveDeletedWatch - atomic save', () => {
-  it('closes the stale watcher, binds a replacement and re-enters the change path', async () => {
+  it('re-arms through the port and re-enters the change path', async () => {
     await resolveDeletedWatch(file, true, harness.deps)
 
-    expect(harness.events).toEqual(['close-stale', 'create', 'replace', 'change'])
-    expect(harness.record.watcher).toBe(asFsWatcher(harness.createdWatchers[0]))
-  })
-
-  it('closes the stale watcher BEFORE creating its replacement', async () => {
-    // Fire-and-forget close would overlap two chokidar watchers on one path,
-    // and this app has a file-descriptor budget to respect (issue #70, LOW-2).
-    await resolveDeletedWatch(file, true, harness.deps)
-
-    expect(harness.events.indexOf('close-stale')).toBeLessThan(harness.events.indexOf('create'))
-    expect(harness.firstWatcher.close).toHaveBeenCalledTimes(1)
+    expect(harness.events).toEqual(['rearm', 'change'])
   })
 
   it('re-arms when the detector said "gone" but the rename has landed by now', async () => {
     await resolveDeletedWatch(file, false, harness.deps)
 
-    expect(harness.events).toContain('create')
-    expect(harness.events).not.toContain('deleted')
+    expect(harness.events).toEqual(['rearm', 'change'])
   })
 })
 
 describe('resolveDeletedWatch - genuine delete', () => {
-  it('reports the delete and drops the entry without creating a watcher', async () => {
+  it('reports the delete and drops the entry without re-arming', async () => {
     unlinkSync(file)
 
     await resolveDeletedWatch(file, false, harness.deps)
 
     expect(harness.events).toEqual(['deleted', 'discard'])
-    expect(harness.createdWatchers).toHaveLength(0)
   })
 
-  it('drops the entry when the file vanishes between the check and the new watcher', async () => {
+  it('drops the entry when the file vanishes between the re-arm and the check after it', async () => {
     // TOCTOU: the replacement watcher is already bound to nothing.
-    harness.state.confined = true
-    const originalCreate = harness.deps.createWatcher
-    harness.deps.createWatcher = path => {
-      const watcher = originalCreate(path)
-      unlinkSync(file)
-      return watcher
-    }
+    harness.state.duringRearm = () => unlinkSync(file)
 
     await resolveDeletedWatch(file, true, harness.deps)
 
-    expect(harness.events).toEqual(['close-stale', 'create', 'replace', 'deleted', 'discard'])
+    expect(harness.events).toEqual(['rearm', 'deleted', 'discard'])
+  })
+
+  it('reports a delete when the re-arm found the file missing', async () => {
+    harness.state.outcome = 'missing'
+    harness.state.duringRearm = () => unlinkSync(file)
+
+    await resolveDeletedWatch(file, true, harness.deps)
+
+    expect(harness.events).toEqual(['rearm', 'deleted', 'discard'])
   })
 })
 
@@ -199,44 +154,68 @@ describe('resolveDeletedWatch - bail-outs', () => {
     expect(harness.events).toEqual([])
   })
 
-  it('announces the dead watch when the session moved on', async () => {
-    harness.state.version = 2
+  it('leaves a watch suspended for a project switch to its resume', async () => {
+    harness.entry.suspended = true
 
     await resolveDeletedWatch(file, true, harness.deps)
 
-    expect(harness.deadReasons).toEqual([WATCH_DEAD_SESSION_ENDED])
-    expect(harness.events).toEqual(['dead', 'discard'])
+    expect(harness.events).toEqual([])
   })
 
-  it('refuses to re-arm a path that no longer resolves inside the project', async () => {
+  it('ends the watch when the file no longer resolves inside the project', async () => {
     // The file was replaced by someone else, so it may now be a symlink out of
     // the project - re-arming would point an automatic re-read at the target.
-    harness.state.confined = false
+    harness.state.outcome = 'outside-project'
 
     await resolveDeletedWatch(file, true, harness.deps)
 
-    expect(harness.deadReasons).toEqual([WATCH_DEAD_OUTSIDE_PROJECT])
-    expect(harness.events).toEqual(['dead', 'discard'])
-    expect(harness.createdWatchers).toHaveLength(0)
+    expect(harness.deadReasons).toEqual(['outside-project'])
+    expect(harness.events).toEqual(['rearm', 'dead', 'discard'])
+  })
+
+  it('reports a delete, not an escape, when an unresolvable file is gone', async () => {
+    harness.state.outcome = 'outside-project'
+    harness.state.duringRearm = () => unlinkSync(file)
+
+    await resolveDeletedWatch(file, true, harness.deps)
+
+    expect(harness.deadReasons).toEqual([])
+    expect(harness.events).toEqual(['rearm', 'deleted', 'discard'])
+  })
+
+  it('ends the watch when the file is no longer a regular file', async () => {
+    harness.state.outcome = 'unsupported'
+
+    await resolveDeletedWatch(file, true, harness.deps)
+
+    expect(harness.deadReasons).toEqual(['unsupported'])
   })
 
   it('announces the dead watch when a replacement watcher cannot be created', async () => {
-    harness.state.createThrows = true
+    harness.state.outcome = 'failed'
 
     await resolveDeletedWatch(file, true, harness.deps)
 
-    expect(harness.deadReasons).toEqual([WATCH_DEAD_REARM_FAILED])
-    expect(harness.events).toEqual(['close-stale', 'dead', 'discard'])
+    expect(harness.deadReasons).toEqual(['restart-failed'])
+    expect(harness.events).toEqual(['rearm', 'dead', 'discard'])
   })
 
-  it('closes the replacement when the service no longer accepts it', async () => {
-    // The record was swapped or dropped while the stale watcher was closing;
-    // the new watcher belongs to nobody and must not be left running.
-    harness.state.acceptReplacement = false
+  it('stops when the re-arm says the entry is stale', async () => {
+    harness.state.outcome = 'stale'
 
     await resolveDeletedWatch(file, true, harness.deps)
 
-    expect(harness.events).toEqual(['close-stale', 'create', 'close-replacement'])
-    expect(harness.events).not.toContain('change')
+    expect(harness.events).toEqual(['rearm'])
+  })
+
+  it('leaves a newer entry on the path alone', async () => {
+    // The record was swapped while the re-arm ran: its verdict belongs to nobody
+    harness.state.duringRearm = () => {
+      harness.state.held = { ...harness.entry }
+    }
+
+    await resolveDeletedWatch(file, true, harness.deps)
+
+    expect(harness.events).toEqual(['rearm'])
   })
 })

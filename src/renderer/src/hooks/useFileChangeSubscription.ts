@@ -1,193 +1,147 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Read-only file-watch subscription.
+ * The image viewer's adapter on "follow the file on disk" (#478, plan S15,
+ * decision 41, F30).
  *
- * A surface that only *displays* a file – the image viewer today, any binary or
- * read-only preview tomorrow – needs three things from the watcher: "the bytes
- * changed", "the file is gone", and "this watch is dead". It needs none of the
- * Markdown editor's conflict, echo-detection or save-guard machinery, and it
- * must never pause the watch.
+ * It supplies only the viewer's update rule; the shared tracker
+ * (`useFreshness`) does the following, catching up, settling, retrying,
+ * deleted and restart work:
  *
- * Why not `useFileWatcher({ mode: 'binary' })`: that hook is structurally
- * text-coupled. `handleExternalChange` reads the file as UTF-8 and hands the
- * resulting `string` to `onContentUpdate`; there is no mode flag that makes a
- * `string`-typed reload path serve a binary surface.
+ * - **read**: `file:readImage` with the version on screen, so an unchanged
+ *   file costs no bytes (`unchanged`);
+ * - **readNow**: only while the tab is shown – a hidden tab marks the change
+ *   and reads when it is shown again (S1);
+ * - **apply**: hand the bytes and stamp already read to the viewer
+ *   (`onBytes`), which decodes and commits them – never a second read (F30, F8).
+ *
+ * The viewer never writes, so this module never sees the pause or the save
+ * port (decision 7).
  *
  * @module useFileChangeSubscription
  * @see Issue #70 - preview tabs show stale content when the file changes
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
-import {
-  acquireFileWatch,
-  createFileWatchSlot,
-  forgetFileWatch,
-  releaseFileWatch,
-  type FileWatchSlot
-} from './fileWatchSlot'
-import { logger } from '../utils/logger'
-import { useDeletedFileProbe } from './useDeletedFileProbe'
+import type {
+  FileStamp,
+  FreshnessState,
+  ReadOutcome,
+  UpdateRule
+} from '../../../shared/freshness/freshnessTypes'
 import { fileGateway } from '../services/fileGateway'
-import { fileWatchGateway } from '../services/fileWatchGateway'
+import { freshnessEnvironment } from '../services/freshness/windowFreshness'
+import { logger } from '../utils/logger'
+import { useFreshness } from './useFreshness'
+import { useLatestRef } from './useLatestRef'
 
-/**
- * Why auto-refresh stopped working for a path.
- *
- * Mirrors `WatchUnavailableReason` in the image viewer's status logic; kept
- * structurally identical (a string union) so consumers can pass it straight
- * through without a mapping layer.
- */
-export type FileWatchUnavailableReason = 'limit' | 'watcher-error'
-
-/**
- * Marker substring of the main process's watched-files cap error.
- *
- * `FileWatcherService.watchFile` throws
- * `Maximum watched files limit reached (100)` when the app-wide cap is full,
- * and `file-watch:start` passes `error.message` back verbatim, so this is the
- * only evidence the renderer has that the cap – rather than some other watcher
- * fault – refused the watch.
- *
- * NOTE: coupled to that message by string. It is asserted in
- * `FileWatcherService.test.ts` main-side and in the tests for this module, so a
- * reworded throw fails a test instead of silently mis-blaming the user.
- */
-const WATCH_LIMIT_ERROR_MARKER = 'Maximum watched files limit reached'
-
-/**
- * Attributes a failed `fileWatch.start` to a cause the UI can state honestly.
- *
- * `start` has more than one way to fail: the cap, an atomic-save re-arm that
- * ended the watch while we were joining it (`File watch ended while joining:
- * …`), a rejected IPC call. Only the first is "too many files are open", and
- * telling a user that when it was not sends them closing tabs for nothing – so
- * every unrecognised failure is reported as a watcher fault instead.
- *
- * @param error - The bridge's error string, when the main process refused
- * @returns `'limit'` only for the watched-files cap, `'watcher-error'` otherwise
- *
- * @example
- * ```ts
- * classifyWatchStartFailure('Maximum watched files limit reached (100)') // 'limit'
- * classifyWatchStartFailure('File watch ended while joining: /a.png')    // 'watcher-error'
- * classifyWatchStartFailure(undefined)                                   // 'watcher-error'
- * ```
- */
-export function classifyWatchStartFailure(error?: string): FileWatchUnavailableReason {
-  return error?.includes(WATCH_LIMIT_ERROR_MARKER) ? 'limit' : 'watcher-error'
+/** The bytes of one version of an image, as `file:readImage` returned them. */
+export interface ImageBytes {
+  readonly dataUrl: string
+  readonly version: string
+  readonly stamp: FileStamp
 }
+
+/** What a read gave the tracker: new bytes, or "the version on screen is current". */
+export type ImageVersion = { readonly kind: 'bytes'; readonly bytes: ImageBytes } | { readonly kind: 'unchanged' }
 
 /** Options for {@link useFileChangeSubscription}. */
 export interface UseFileChangeSubscriptionOptions {
-  /**
-   * Called when the watched file changed on disk.
-   *
-   * Held in a ref, so an inline arrow function is fine: changing its identity
-   * never restarts the watch.
-   */
-  onExternalChange: () => void
+  /** The viewer shows its first image; the tracker starts from `baseline`. */
+  readonly ready: boolean
+  /** The stamp of the image on screen when the tracker starts (G3). */
+  readonly baseline?: FileStamp
+  /** The tab is shown: only a shown tab reads. */
+  readonly visible: boolean
+  /** The version token of the image on screen (echoed to `file:readImage`). */
+  readonly currentVersion: string | undefined
+  /** Show these bytes; called once per new version read. */
+  readonly onBytes: (bytes: ImageBytes) => void
 }
 
 /** State and actions returned by {@link useFileChangeSubscription}. */
 export interface UseFileChangeSubscriptionResult {
-  /** True for `INDICATOR_DURATION_MS` after the consumer calls `markReloaded`. */
-  isReloading: boolean
-  /** The file was deleted on disk and was still gone when we re-checked. */
-  isFileDeleted: boolean
-  /** Auto-refresh is dead: the watch never started, errored, or the session ended. */
-  isWatchUnavailable: boolean
-  /** Why auto-refresh is unavailable, or `null` when it is fine. */
-  unavailableReason: FileWatchUnavailableReason | null
-  /** Consumer signals "the refresh landed" – raises the transient indicator. */
-  markReloaded: () => void
-  /** Re-check the file and restart the watch. Resolves `true` when the watch is live again. */
-  recover: () => Promise<boolean>
+  /** The one state object the banner reads (decision 35). */
+  readonly state: FreshnessState
+  /** True for `INDICATOR_DURATION_MS` after the viewer calls `markReloaded`. */
+  readonly isReloading: boolean
+  /** The file was deleted on disk and was still gone when re-checked. */
+  readonly isFileDeleted: boolean
+  /** Auto-refresh stopped (not for a project that closed). */
+  readonly isWatchUnavailable: boolean
+  /** The size of the file when the last read refused it as too large. */
+  readonly tooLargeSize: number | undefined
+  /** The viewer signals "the refresh landed" – raises the transient indicator. */
+  readonly markReloaded: () => void
+  /**
+   * Reload: a new watch and a forced read. Resolves `true` when the tab follows
+   * its file again. Before the first image is on screen there is no watch yet:
+   * it only checks the file is there (the viewer then reads it afresh).
+   */
+  readonly reload: () => Promise<boolean>
+  /** The last Reload found no file on disk (its verdict says "still missing", not "could not restart"). */
+  readonly reloadFoundMissing: boolean
+}
+
+/** Rough parse of the main process's "too large" refusal (`imageRead.ts`): size in MB. */
+const TOO_LARGE = /too large \((\d+(?:\.\d+)?) MB\)/i
+const MISSING = /ENOENT|no such file|does not exist/i
+/** The main process's torn-read refusal (`imageRead.ts` `FileBusyError`, P3): the file is still being written. */
+const TORN_READ = /changed while it was read/i
+
+/** Map a rejected `file:readImage` to what the tracker acts on. */
+export function imageReadFailure(error: unknown): { outcome: ReadOutcome<ImageVersion>; tooLargeBytes?: number } {
+  const message = error instanceof Error ? error.message : String(error)
+  const tooLarge = TOO_LARGE.exec(message)
+  if (tooLarge) {
+    return { outcome: { status: 'blocked', reason: 'too-large' }, tooLargeBytes: Number(tooLarge[1]) * 1024 * 1024 }
+  }
+  if (MISSING.test(message)) return { outcome: { status: 'missing' } }
+  // A torn read means "still being written": settle and read again, without using up a read retry (P3, decision 34)
+  if (TORN_READ.test(message)) return { outcome: { status: 'busy' } }
+  return { outcome: { status: 'failed' } }
 }
 
 /**
- * Subscribes to file-watch events for a single path, read-only.
+ * Follow an image file on disk for the viewer.
  *
- * Invariants (asserted in `useFileChangeSubscription.test.ts`):
- *
- * 1. **It never calls `fileWatch.pause` / `fileWatch.resume`.** Pause is global
- *    per path with no safety timeout, so a stuck pause would deafen every other
- *    consumer of that path – including the Markdown editor. A surface that
- *    never writes has nothing to pause for.
- * 2. **The subscription effect depends on `[filePath]` only.** Callbacks live in
- *    refs, so a re-render with a new inline callback cannot tear the watch down
- *    and start it again.
- * 3. **A `deleted` event is re-checked before it is believed.** A tmp→rename
- *    slower than the main process's 100 ms atomic-save window arrives here as a
- *    delete for a file that exists; we re-stat, and if the file is back we
- *    recover and report a change instead of showing a "deleted" banner.
- * 4. **`isWatchUnavailable` and `isReloading` cannot both be true in practice** –
- *    `watchFile` throws before adding the caller to the subscriber set, so a
- *    failed start can never receive a change event. Consumers still resolve the
- *    two with explicit precedence rather than relying on that.
- * 5. **Exactly one subscription is held at a time.** `fileWatch.start` is a
- *    counting acquire main-side, so `recover()` releases before it re-starts
- *    and teardown only releases what was actually acquired. A `deleted` event
- *    means the main process already dropped the watch, so the slot forgets
- *    its hold without a `stop`. See {@link FileWatchSlot} for what each
- *    imbalance costs.
- * 6. **A deleted file is looked for until it is back** (#450). Nothing reports
- *    a deleted file reappearing, so while `isFileDeleted` holds the hook asks
- *    the disk every couple of seconds (`useDeletedFileProbe`) and, when the
- *    file is there, runs `recover()` and reports a change.
- *
- * @param filePath - Absolute path to watch. An empty string subscribes to nothing.
- * @param options - Change callback
- * @returns Watch state plus the `markReloaded` / `recover` actions
+ * @param filePath - Absolute path to follow. An empty string follows nothing.
+ * @param options - When to start, visibility, and where new bytes go
  *
  * @example
  * ```tsx
- * const { isReloading, isFileDeleted, markReloaded, recover } =
- *   useFileChangeSubscription(filePath, {
- *     onExternalChange: () => refresh()
- *   })
+ * const watch = useFileChangeSubscription(filePath, {
+ *   ready: source !== null, baseline: source?.stamp, visible, currentVersion: source?.version, onBytes: pushSource
+ * })
  * ```
  */
 export function useFileChangeSubscription(
   filePath: string,
   options: UseFileChangeSubscriptionOptions
 ): UseFileChangeSubscriptionResult {
+  const { ready, baseline, visible } = options
   const [isReloading, setIsReloading] = useState(false)
-  const [isFileDeleted, setIsFileDeleted] = useState(false)
-  const [unavailableReason, setUnavailableReason] =
-    useState<FileWatchUnavailableReason | null>(null)
+  const [tooLargeSize, setTooLargeSize] = useState<number | undefined>(undefined)
+  const [reloadFoundMissing, setReloadFoundMissing] = useState(false)
 
-  // Held in a ref so the subscription effect can depend on [filePath] alone.
-  const onExternalChangeRef = useRef(options.onExternalChange)
-  useEffect(() => {
-    onExternalChangeRef.current = options.onExternalChange
-  }, [options.onExternalChange])
-
+  const currentVersionRef = useLatestRef(options.currentVersion)
+  const onBytesRef = useLatestRef(options.onBytes)
+  const visibleRef = useLatestRef(visible)
   const indicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isMountedRef = useRef(true)
-
-  // This consumer's single hold on the main-process watch. One slot per hook
-  // instance, created lazily so every mount starts from "holds nothing".
-  const [slot] = useState<FileWatchSlot>(createFileWatchSlot)
 
   useEffect(() => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
+      if (indicatorTimerRef.current) clearTimeout(indicatorTimerRef.current)
     }
   }, [])
 
-  /**
-   * Raises the transient indicator and schedules its own teardown.
-   *
-   * Unlike `useFileWatcher.reloadFromDisk`, the timer is cleared on unmount, so
-   * a tab closed inside the 1 s window cannot produce a post-teardown update.
-   */
   const markReloaded = useCallback(() => {
     if (!isMountedRef.current) return
-
     setIsReloading(true)
     if (indicatorTimerRef.current) clearTimeout(indicatorTimerRef.current)
     indicatorTimerRef.current = setTimeout(() => {
@@ -196,168 +150,62 @@ export function useFileChangeSubscription(
     }, INDICATOR_DURATION_MS)
   }, [])
 
-  useEffect(
-    () => () => {
-      if (indicatorTimerRef.current) {
-        clearTimeout(indicatorTimerRef.current)
-        indicatorTimerRef.current = null
+  const rule = useMemo<UpdateRule<ImageVersion>>(
+    () => ({
+      read: async (): Promise<ReadOutcome<ImageVersion>> => {
+        try {
+          const response = await fileGateway.readImage({ filePath, knownVersion: currentVersionRef.current })
+          if (!response.stamp) return { status: 'failed' }
+          if (response.status === 'unchanged') return { status: 'ok', version: { kind: 'unchanged' }, stamp: response.stamp }
+          const bytes: ImageBytes = { dataUrl: response.dataUrl, version: response.version, stamp: response.stamp }
+          return { status: 'ok', version: { kind: 'bytes', bytes }, stamp: response.stamp }
+        } catch (error) {
+          const { outcome, tooLargeBytes } = imageReadFailure(error)
+          if (tooLargeBytes !== undefined && isMountedRef.current) setTooLargeSize(tooLargeBytes)
+          if (outcome.status === 'failed') logger.warn('Image read for a refresh failed', { filePath })
+          return outcome
+        }
+      },
+      // A hidden tab marks the change and reads when it is shown (S1)
+      readNow: () => visibleRef.current,
+      apply: (version) => {
+        if (version.kind === 'bytes') onBytesRef.current(version.bytes)
+        return 'applied'
       }
-    },
-    []
+    }),
+    [filePath, currentVersionRef, onBytesRef, visibleRef]
   )
 
-  /**
-   * Re-checks the file and restarts the watch.
-   *
-   * Backs the banner's Reload button and the automatic recovery from a
-   * misreported delete – the latter fires with no user action at all, on every
-   * slow tmp→rename, so it must be exactly as leak-free as mount/unmount.
-   *
-   * Both degraded states clear together: one affordance, one outcome.
-   */
-  const recover = useCallback(async (): Promise<boolean> => {
-    if (!filePath) return false
-
-    try {
-      await fileGateway.getStats({ filePath })
-    } catch {
-      // Still gone – keep the deleted banner up rather than claiming recovery.
-      if (isMountedRef.current) setIsFileDeleted(true)
-      return false
-    }
-
-    // After a delete, or an error that ended the watch, the slot already forgot
-    // its hold (the main process dropped the whole entry), so this release
-    // sends nothing and only the acquire below talks to the main process: a
-    // `stop` here could take the count of another consumer of the same file
-    // and deafen it (#252). With a live watch – a recover after a plain
-    // chokidar error – the release is what keeps this consumer at one count:
-    // `start` increments a per-window count, so a bare re-`start` would hold
-    // two against one teardown `stop`, and the watcher would outlive the panel
-    // (see {@link FileWatchSlot}).
-    await releaseFileWatch(slot, filePath)
-    const { started, error, cause } = await acquireFileWatch(slot, filePath)
-
-    if (!started) {
-      logger.error('Failed to restart file watch', cause, { filePath, error })
-      // L4: a watcher fault must not be reported as "too many files are open".
-      // The failure itself decides the reason - same rule as the mount path -
-      // so a restart refused by a watcher fault never re-blames the cap, and a
-      // restart genuinely refused by the cap says so even after a watcher error.
-      if (isMountedRef.current) setUnavailableReason(classifyWatchStartFailure(error))
-      return false
-    }
-
-    if (isMountedRef.current) {
-      setIsFileDeleted(false)
-      setUnavailableReason(null)
-    }
-    return true
-  }, [filePath, slot])
-
-  // `recover` is stable per path, but the subscription must depend on
-  // [filePath] alone (invariant 2), so it is reached through a ref.
-  const recoverRef = useRef(recover)
-  useEffect(() => {
-    recoverRef.current = recover
-  }, [recover])
-
-  // A genuine delete ended the watch, so nothing reports the file coming back
-  // (a branch switch, a merge). Look for it while the tab shows the deleted
-  // state, and recover exactly as a misreported delete does (#450).
-  useDeletedFileProbe(filePath, isFileDeleted, async () => {
-    if (await recoverRef.current()) onExternalChangeRef.current()
+  const { state, tracker } = useFreshness<ImageVersion>({
+    filePath: filePath || null,
+    profile: 'image',
+    rule,
+    ready,
+    baseline,
+    visible
   })
 
-  // A new path starts with neither degraded state. Reset during render, when
-  // the path changes, rather than in the subscription effect below.
-  const [seenFilePath, setSeenFilePath] = useState(filePath)
-  if (seenFilePath !== filePath) {
-    setSeenFilePath(filePath)
-    if (filePath) {
-      setIsFileDeleted(false)
-      setUnavailableReason(null)
+  const reload = useCallback(async (): Promise<boolean> => {
+    if (!filePath) return false
+    const source = freshnessEnvironment().source
+    if (tracker) {
+      await tracker.reload()
+      if (tracker.getState().watch.kind === 'stopped') return false
     }
-  }
-
-  // Subscription. [filePath] only – see invariant 2.
-  useEffect(() => {
-    if (!filePath) return
-
-    let isActive = true
-
-    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
-      if (!isActive || started) return
-      // Honest degradation: the tab is stale from here on, and the UI says so -
-      // with the cause the failure actually carries, not an assumed one.
-      logger.error('Failed to start read-only file watch', cause, { filePath, error })
-      setUnavailableReason(classifyWatchStartFailure(error))
-    })
-
-    const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
-      if (!isActive || data.filePath !== filePath) return
-      // A change proves the file is back; clear a stale deleted banner.
-      setIsFileDeleted(false)
-      onExternalChangeRef.current()
-    })
-
-    const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
-      if (!isActive || data.filePath !== filePath) return
-
-      // Whatever the disk says, the main process dropped the watch before
-      // sending this: the slot holds nothing now (#252, invariant 5).
-      forgetFileWatch(slot)
-
-      // Invariant 3: never believe a delete without re-checking the disk.
-      fileGateway
-        .getStats({ filePath })
-        .then(async () => {
-          if (!isActive) return
-          logger.info('Delete event for a file that still exists; recovering the watch', {
-            filePath
-          })
-          await recoverRef.current()
-          if (isActive) onExternalChangeRef.current()
-        })
-        .catch(() => {
-          if (!isActive) return
-          logger.warn('Watched file deleted on disk', { filePath })
-          setIsFileDeleted(true)
-        })
-    })
-
-    const unsubscribeError = fileWatchGateway.onFileError((data) => {
-      if (!isActive || data.filePath !== filePath) return
-      // The main process ended the watch: forget the hold, as on a delete,
-      // so Reload restarts it without a `stop` (#252, invariant 5)
-      if (data.ended) forgetFileWatch(slot)
-      logger.error('Read-only file watch error', undefined, {
-        filePath,
-        error: data.error,
-        ended: data.ended === true
-      })
-      setUnavailableReason('watcher-error')
-    })
-
-    return () => {
-      isActive = false
-      // Queued behind the acquire above, so a mount→unmount faster than the
-      // IPC round trip can never deliver `stop` first; and a start that was
-      // refused or rejected releases nothing, so we never decrement a count
-      // this consumer does not hold.
-      void releaseFileWatch(slot, filePath)
-      unsubscribeChanged()
-      unsubscribeDeleted()
-      unsubscribeError()
-    }
-  }, [filePath, slot])
+    // The reload's read is scheduled, not awaited: ask the disk whether the file is there
+    const missing = (await source.probe(filePath)).status === 'missing'
+    if (isMountedRef.current) setReloadFoundMissing(missing)
+    return !missing
+  }, [tracker, filePath])
 
   return {
+    state,
     isReloading,
-    isFileDeleted,
-    isWatchUnavailable: unavailableReason !== null,
-    unavailableReason,
+    isFileDeleted: state.content.kind === 'deleted',
+    isWatchUnavailable: state.watch.kind === 'stopped' && state.watch.reason !== 'project-closed',
+    tooLargeSize,
     markReloaded,
-    recover
+    reload,
+    reloadFoundMissing
   }
 }

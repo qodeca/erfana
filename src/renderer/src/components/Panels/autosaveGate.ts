@@ -6,6 +6,16 @@
  * @module autosaveGate
  */
 
+/** What the gate reads: the tab's notices, from its freshness state. */
+export interface AutosaveGateInput {
+  /** The tab shows the "file changed on disk" bar */
+  readonly conflict: boolean
+  /** The tab shows the "deleted on disk" notice */
+  readonly deleted: boolean
+  /** The file cannot be shown (too large, binary, another encoding, unreadable): the tab is read-only */
+  readonly contentBlocked: boolean
+}
+
 /**
  * Whether an autosave may write the tab's buffer now.
  *
@@ -14,11 +24,10 @@
  *   file and dismiss the bar.
  * - A file that was deleted on disk (a branch switch, a merge) stays deleted
  *   until the user saves on purpose (#460): an autosave would bring it back
- *   without the user choosing to. Cmd/Ctrl+S ("Save to restore it") still works.
- *
- * @param externalChangeDetected - The tab shows the "file changed on disk" bar
- * @param isFileDeleted - The tab shows the "deleted on disk" banner
+ *   without the user choosing to. Restore file (and Cmd/Ctrl+S) still works.
+ * - A file whose content the tab cannot show (#478, F1): the buffer is the
+ *   last good read, and writing it would replace whatever the file holds now.
  */
-export function shouldAutosave(externalChangeDetected: boolean, isFileDeleted: boolean): boolean {
-  return !externalChangeDetected && !isFileDeleted
+export function shouldAutosave({ conflict, deleted, contentBlocked }: AutosaveGateInput): boolean {
+  return !conflict && !deleted && !contentBlocked
 }

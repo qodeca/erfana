@@ -290,7 +290,7 @@ Cards: docs/designs/comments/markdown-comments/states.html (keyboard picking; fo
 
 **'Comments paused' state when the Markdown buffer differs from disk** – P0, surfaces: markdown-proposed. Source findings: STA-07.
 
-**Problem.** The preview renders the editor buffer (EditorContentLayout.tsx:156-159), but threads come from main's parse of the file on disk (md design :187), and icons are placed by rendered `data-line-start`. With unsaved edits or the 'changed on disk' conflict (MarkdownEditorPanel.tsx:673-674), icons and underlines attach to the wrong blocks. §8 covers only blocking the save.
+**Problem.** The preview renders the editor buffer (EditorContentLayout.tsx:156-159), but threads come from main's parse of the file on disk (md design :187), and icons are placed by rendered `data-line-start`. With unsaved edits or the 'changed on disk' conflict (MarkdownEditorPanel.tsx:654-660), icons and underlines attach to the wrong blocks. §8 covers only blocking the save.
 
 **Design.**
 

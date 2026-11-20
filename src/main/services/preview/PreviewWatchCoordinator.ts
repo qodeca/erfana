@@ -13,18 +13,30 @@
  *      outside the project root, into an excluded directory, or does not exist
  *      is DROPPED, counted into the result's `dropped` list, and left for the
  *      consumer to badge. No watch is acquired for it. Files are DATA: an
- *      out-of-root path is reported, never followed.
+ *      out-of-root path is reported, never followed. One exception (#478
+ *      QG-11a V2): a candidate that is now `missing` but resolved last time to
+ *      a target still watched KEEPS that watch, so the pool tracker that saw
+ *      the delete (whose reload brought us here) also sees the file come back
+ *      – a `git checkout` that deletes and restores a stylesheet reloads the
+ *      page again. The target already passed `confinePath`, and the watch layer
+ *      re-checks it on every arm and probe.
  *   2. The confined targets are deduplicated and capped at
- *      `PREVIEW.MAX_WATCHED_FILES` PER PREVIEW (additive to the app-wide cap);
- *      candidates past the cap are dropped in input priority order.
+ *      `PREVIEW.MAX_WATCHED_FILES` PER PREVIEW (the `preview` watch bucket's
+ *      per-owner cap); candidates past it are dropped in input priority order.
+ *      Past the bucket's app-wide total a watch is queued by the watch layer,
+ *      not dropped, and started when a slot frees (#478, G9).
  *   3. The desired set is diffed against the currently-watched set. Removed
  *      watches are RELEASED and AWAITED BEFORE new watches are acquired, so a
  *      reload storm cannot transiently stack file descriptors (chokidar
  *      `close()` is async).
  *
- * A change on any watched file is coalesced over `PREVIEW.WATCH_COALESCE_MS`
- * into a single "reload needed" signal carrying the changed paths, which the
- * consumer (the view service) feeds to `PreviewReloadPolicy`.
+ * A change on any watched file is coalesced over the `preview` timing
+ * profile's `poolCoalesceMs` into a single "reload needed" signal carrying the
+ * changed paths, which the consumer (the view service) feeds to
+ * `PreviewReloadPolicy`. That coalesce is the preview's only burst control
+ * (#478, F21). `recheck()` is the safety net: every watched file is compared
+ * with the version last seen (the view shown again; focus and wake reach the
+ * pool by themselves).
  *
  * The candidates arrive only after the page has loaded its files, so a file
  * can change before its watch exists. `options.changedSince` – when the page's
@@ -35,6 +47,7 @@
 import { confinePath, type ConfineVerdict } from './previewPathResolve'
 import type { IPreviewWatchPool, PreviewWatchStartOptions } from './PreviewWatchPool'
 import { PREVIEW } from '../../../shared/constants'
+import { TIMING_PROFILES } from '../../../shared/freshness/timingProfiles'
 
 /** Why a candidate was not watched. */
 export type WatchDropReason = 'out-of-root' | 'over-cap' | 'watch-failed'
@@ -68,7 +81,7 @@ export interface PreviewWatchCoordinatorDeps {
   readonly confine?: ConfineFn
   /** Per-preview watch cap; defaults to `PREVIEW.MAX_WATCHED_FILES`. */
   readonly maxWatched?: number
-  /** Coalesce window in ms; defaults to `PREVIEW.WATCH_COALESCE_MS`. */
+  /** Coalesce window in ms; defaults to the `preview` profile's `poolCoalesceMs`. */
   readonly coalesceMs?: number
   /** Timer scheduler; defaults to `setTimeout`. Injected for tests. */
   readonly setTimer?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>
@@ -87,6 +100,8 @@ export interface IPreviewWatchCoordinator {
     candidatePaths: readonly string[],
     options?: PreviewWatchStartOptions
   ): Promise<WatchSetResult>
+  /** Compare every watched file with the version last seen; a change goes through the coalesce (S1). */
+  recheck(): void
   /** Release every watch and cancel the pending coalesce timer. */
   dispose(): Promise<void>
 }
@@ -99,12 +114,14 @@ export function createPreviewWatchCoordinator(
 ): IPreviewWatchCoordinator {
   const confine = deps.confine ?? confinePath
   const maxWatched = deps.maxWatched ?? PREVIEW.MAX_WATCHED_FILES
-  const coalesceMs = deps.coalesceMs ?? PREVIEW.WATCH_COALESCE_MS
+  const coalesceMs = deps.coalesceMs ?? TIMING_PROFILES.preview.poolCoalesceMs
   const setTimer = deps.setTimer ?? setTimeout
   const clearTimer = deps.clearTimer ?? clearTimeout
 
   /** Confined absolute paths currently watched. */
   let watched = new Set<string>()
+  /** Each candidate of the current set → the confined target it was watched as (V2). */
+  let targetOf = new Map<string, string>()
 
   // Once disposed, no `setWatchSet` may acquire a watch this coordinator would
   // never release. In-flight calls are tracked so `dispose` can await them.
@@ -137,16 +154,27 @@ export function createPreviewWatchCoordinator(
   }
 
   /**
+   * A candidate deleted for now keeps the watch it had, so its pool tracker
+   * sees the file come back (V2); one that never resolved stays dropped.
+   */
+  const keptWhileMissing = (candidate: string, verdict: ConfineVerdict): string | null => {
+    if (verdict.ok || verdict.reason !== 'missing') return null
+    const target = targetOf.get(candidate)
+    return target !== undefined && watched.has(target) ? target : null
+  }
+
+  /**
    * Confine + dedupe + cap the candidate set into a desired watch set plus the
    * dropped candidates, all preserving input priority order.
    */
   const resolveDesired = async (
     candidatePaths: readonly string[]
-  ): Promise<{ desired: string[]; dropped: DroppedCandidate[] }> => {
+  ): Promise<{ desired: string[]; dropped: DroppedCandidate[]; targets: Map<string, string> }> => {
     const desired: string[] = []
     const seen = new Set<string>()
     const rawSeen = new Set<string>()
     const dropped: DroppedCandidate[] = []
+    const targets = new Map<string, string>()
 
     for (const candidate of candidatePaths) {
       // Cheap syntactic dedup first, so a repeated literal costs no realpath.
@@ -162,17 +190,18 @@ export function createPreviewWatchCoordinator(
       }
 
       const verdict = await confine(deps.realRoot, candidate)
-      if (!verdict.ok) {
+      const target = verdict.ok ? verdict.realTarget : keptWhileMissing(candidate, verdict)
+      if (target === null) {
         dropped.push({ candidate, reason: 'out-of-root' })
         continue
       }
-      const target = verdict.realTarget
+      targets.set(candidate, target)
       if (seen.has(target)) continue
       seen.add(target)
       desired.push(target)
     }
 
-    return { desired, dropped }
+    return { desired, dropped, targets }
   }
 
   const doSetWatchSet = async (
@@ -180,7 +209,7 @@ export function createPreviewWatchCoordinator(
     options: PreviewWatchStartOptions | undefined
   ): Promise<WatchSetResult> => {
     if (disposed) return { watched: [], dropped: [] }
-    const { desired, dropped } = await resolveDesired(candidatePaths)
+    const { desired, dropped, targets } = await resolveDesired(candidatePaths)
     // A dispose can land on either side of the awaits below. Bailing here (and
     // before the acquire loop) stops a disposed coordinator from acquiring a
     // watch nothing will ever release.
@@ -218,6 +247,7 @@ export function createPreviewWatchCoordinator(
     }
 
     watched = desiredSet
+    targetOf = targets
     return { watched: desired, dropped }
   }
 
@@ -232,6 +262,10 @@ export function createPreviewWatchCoordinator(
       return op
     },
 
+    recheck(): void {
+      if (!disposed) deps.pool.recheck()
+    },
+
     async dispose(): Promise<void> {
       disposed = true
       // Let any in-flight setWatchSet observe `disposed` and unwind before we
@@ -243,6 +277,7 @@ export function createPreviewWatchCoordinator(
         await deps.pool.release(target)
       }
       watched = new Set<string>()
+      targetOf = new Map<string, string>()
       // The pool is this view's own (built per coordinator at the composition
       // root) and had no production caller for `close()` at all (#112): anything
       // it still holds would outlive the view.

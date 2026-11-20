@@ -206,7 +206,13 @@ export const FAILURE_TYPE_LABELS: Readonly<Record<PreviewFailureType, string>> =
   'frame-excluded': 'Excluded frame',
   'frame-too-deep': 'Frame nested too deep',
   'frame-over-limit': 'Too many frames',
-  'frame-link-blocked': 'Blocked link in frame'
+  'frame-link-blocked': 'Blocked link in frame',
+  // The page's own file watch (#478, plan § 3.6)
+  'auto-refresh-stopped': 'Auto-refresh stopped – changes on disk no longer show here',
+  'watch-limit': 'Too many files open to follow this page live – it updates when you switch to it',
+  'file-unreadable': 'Page file cannot be read right now',
+  'live-refresh-limited':
+    'Live refresh is limited for files on network drives and WSL – Erfana checks for changes when you switch to this tab or window'
 }
 
 /** One grouped bucket of failures sharing a type, in first-seen order. */

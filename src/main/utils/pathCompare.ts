@@ -101,3 +101,15 @@ export function isSamePath(
 ): boolean {
   return comparisonKey(a, caseSensitive, flavour) === comparisonKey(b, caseSensitive, flavour)
 }
+
+/**
+ * The key one watched file is filed under (#478, plan decision 10): the
+ * resolved real path, its extended-length prefix and trailing separators
+ * dropped, folded under the session's case rule (and NFC on darwin). Two
+ * spellings of one file – letter case, an 8.3 name or a junction already
+ * resolved by `realpath`, a decomposed Unicode name on a Mac disk – share a key,
+ * so they share one watch. Pass the `realpath` output, not a requested path.
+ */
+export function pathKey(real: string, caseSensitive: boolean, flavour: PathFlavour = hostPathFlavour): string {
+  return comparisonKey(normaliseResolved(real, flavour), caseSensitive, flavour)
+}

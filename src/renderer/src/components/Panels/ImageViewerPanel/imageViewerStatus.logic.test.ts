@@ -15,7 +15,6 @@ import {
   formatClockTime,
   formatUpdatedAccessibleName,
   formatUpdatedStamp,
-  getBannerMessage,
   getBannerVariant,
   getStatusText,
   getStatusTone,
@@ -47,19 +46,17 @@ describe('getViewerStatus', () => {
   })
 
   it('falls through when the banner is already saying the same thing', () => {
-    // Otherwise role="alert" and role="status" announce one sentence twice.
-    expect(
-      getViewerStatus({ ...IDLE, isWatchUnavailable: true, bannerVariant: 'unavailable' })
-    ).toBe('idle')
+    // Otherwise the notice and the status slot announce one fact twice. The
+    // freshness notice names a dead watch itself (#478 § 3.6).
+    expect(getViewerStatus({ ...IDLE, isWatchUnavailable: true, bannerVariant: 'notice' })).toBe('idle')
     expect(getViewerStatus({ ...IDLE, isStale: true, bannerVariant: 'stale' })).toBe('idle')
   })
 
-  it('still reports a dead watch while the banner reports a DIFFERENT fact', () => {
-    // A deleted file and a dead watch are two facts. Suppressing on a bare
-    // "the banner is visible" boolean would lose the second one entirely.
-    expect(
-      getViewerStatus({ ...IDLE, isWatchUnavailable: true, bannerVariant: 'deleted' })
-    ).toBe('unavailable')
+  it('still reports a failed paint while a notice is up', () => {
+    // A stale image under a notice is explained by the notice (it outranks the
+    // stale banner), so the slot stays quiet only for the stale banner itself
+    expect(getViewerStatus({ ...IDLE, isStale: true, bannerVariant: 'notice' })).toBe('idle')
+    expect(getViewerStatus({ ...IDLE, isWatchUnavailable: true, bannerVariant: 'stale' })).toBe('unavailable')
   })
 
   it('answers a failed Reload before anything else', () => {
@@ -80,43 +77,13 @@ describe('getViewerStatus', () => {
 
 describe('getBannerVariant', () => {
   it.each([
-    [{ isFileDeleted: false, isWatchUnavailable: false, isStale: false }, null],
-    [{ isFileDeleted: true, isWatchUnavailable: false, isStale: false }, 'deleted'],
-    [{ isFileDeleted: false, isWatchUnavailable: true, isStale: false }, 'unavailable'],
-    [{ isFileDeleted: false, isWatchUnavailable: false, isStale: true }, 'stale'],
-    // Most specific cause wins: a deleted file explains both of the others.
-    [{ isFileDeleted: true, isWatchUnavailable: true, isStale: true }, 'deleted'],
-    [{ isFileDeleted: false, isWatchUnavailable: true, isStale: true }, 'unavailable']
+    [{ hasNotice: false, isStale: false }, null],
+    [{ hasNotice: true, isStale: false }, 'notice'],
+    [{ hasNotice: false, isStale: true }, 'stale'],
+    // The freshness notice outranks the viewer's own stale banner: it explains the failed paint too
+    [{ hasNotice: true, isStale: true }, 'notice']
   ])('resolves %j to %s', (input, expected) => {
     expect(getBannerVariant(input)).toBe(expected)
-  })
-})
-
-describe('getBannerMessage', () => {
-  it('names the cap and the remedy for the limit case', () => {
-    // The whole point of moving this out of an aria-label: a sighted user has
-    // to be able to learn that closing tabs is what fixes it.
-    const message = getBannerMessage('unavailable', 'limit')
-    expect(message).toBe(VIEWER_BANNER_COPY.unavailableLimit)
-    expect(message).toContain('100')
-    expect(message).toContain('Close some tabs')
-  })
-
-  it('does not blame the cap for a watcher fault', () => {
-    const message = getBannerMessage('unavailable', 'watcher-error')
-    expect(message).toBe(VIEWER_BANNER_COPY.unavailableWatcherError)
-    expect(message).not.toContain('Close some tabs')
-  })
-
-  it('reports an unattributed refusal as a watcher fault', () => {
-    expect(getBannerMessage('unavailable', null)).toBe(
-      VIEWER_BANNER_COPY.unavailableWatcherError
-    )
-  })
-
-  it('ignores the reason for the variants it cannot apply to', () => {
-    expect(getBannerMessage('deleted', 'limit')).toBe(VIEWER_BANNER_COPY.deleted)
-    expect(getBannerMessage('stale', 'limit')).toBe(VIEWER_BANNER_COPY.stale)
   })
 })
 
@@ -195,17 +162,9 @@ describe('copy constants', () => {
       reloadFailedMissing: 'Still missing on disk',
       reloadFailedWatch: 'Auto-refresh could not be restarted'
     })
+    // The deleted, unavailable and watch-limit copy is the freshness notice's
+    // now (`freshnessNoticeCopy.ts`, #478 § 3.6); the viewer keeps only its own
     expect(VIEWER_BANNER_COPY).toEqual({
-      deleted: 'This file was deleted on disk. Showing the last version that was loaded.',
-      // The cap figure is `MAX_WATCHED_FILES`, guarded against drift in
-      // `constants/fileWatch.test.ts`. It is spelled out here because this
-      // assertion is the copy contract, not a re-derivation of it.
-      unavailableLimit:
-        'Auto-refresh is unavailable – Erfana is watching its maximum of 100 files. ' +
-        'Close some tabs, then choose Reload.',
-      unavailableWatcherError:
-        'Auto-refresh is unavailable – the file watcher stopped. Showing the version that ' +
-        'was loaded. Choose Reload to try again.',
       stale:
         'Could not load the latest version of this file. Showing the version that was ' +
         'loaded. Choose Reload to try again.'

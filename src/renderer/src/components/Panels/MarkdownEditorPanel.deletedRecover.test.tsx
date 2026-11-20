@@ -10,23 +10,31 @@
  * the disk's text silently, and autosave must not write the buffer over the
  * returned file while the choice is open.
  *
- * The real panel, `useFileWatcher`, the deleted-file probe and `useAutoSave`
- * run here; only the leaves jsdom cannot host are replaced: Monaco (a textarea
- * that answers `getEditor().getValue()` with what was typed), the toolbar, the
- * comment layer, the scroll sync and the export handlers. The hook-level rules
+ * The real panel, `useFileWatcher`, the freshness tracker (its deleted-state
+ * probe) and `useAutoSave` run here; only the leaves jsdom cannot host are
+ * replaced: Monaco (a textarea that answers `getEditor().getValue()` with what
+ * was typed), the toolbar, the comment layer, the scroll sync and the export
+ * handlers. The disk and the watch layer are the freshness core's fakes,
+ * installed as the window's freshness environment (#478). The hook-level rules
  * are in `useFileWatcher.restore.test.ts`; this file proves the panel wires
  * them so the typed text survives.
  *
- * Fake timers drive both 2 s clocks (autosave debounce and the probe), so the
- * order of "file back" and "autosave fires" is chosen by the test, not raced.
+ * Fake timers drive every clock (autosave debounce, the delete confirmation
+ * and the probe), so the order of "file back" and "autosave fires" is chosen
+ * by the test, not raced.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { useImperativeHandle, useRef } from 'react'
 import type { IDockviewPanelProps } from 'dockview'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DELETED_FILE_PROBE_INTERVAL_MS } from '../../../../shared/deletedFileProbe'
+import { realClock } from '../../../../shared/clock'
+import { FakeDisk } from '../../../../shared/freshness/__test__/fakeDisk'
+import { FakeSource } from '../../../../shared/freshness/__test__/fakeSource'
+import { DELETED_PROBE_BACKOFF, TIMING_PROFILES } from '../../../../shared/freshness/timingProfiles'
 import { TEST_IDS } from '../../constants/testids'
+import { setFreshnessEnvironmentForTests, setPausableSourceForTests } from '../../services/freshness/windowFreshness'
+import { FRESHNESS_NOTICE_TEST_IDS } from '../FileConflictNotification/freshnessNoticeCopy'
 import type { EditorContentLayoutProps } from './EditorContentLayout'
 import { MarkdownEditorPanel } from './MarkdownEditorPanel'
 
@@ -93,39 +101,14 @@ const PATH = '/project/docs/notes.md'
 const ORIGINAL = '# Notes\n\nOriginal body.\n'
 const TYPED = '# Notes\n\nOriginal body.\n\nTyped while the file was gone.\n'
 const FROM_OTHER_BRANCH = '# Notes\n\nFrom the other branch.\n'
-const DELETED_BANNER = 'This file was deleted on disk. Save to restore it.'
 
-type WatchCallback = (data: { filePath: string }) => void
+/** The fake disk and watch layer, rebuilt per test. */
+let disk: FakeDisk
+let source: FakeSource
+let restoreEnvironment: () => void = () => {}
 
-let deletedListeners: WatchCallback[] = []
-
-/** What the fake disk holds; `null` is "gone". */
-let disk: string | null = ORIGINAL
-
-const readFile = vi.fn(async ({ filePath }: { filePath: string }) => {
-  if (filePath !== PATH || disk === null) throw new Error('ENOENT: no such file or directory')
-  return disk
-})
-const getStats = vi.fn(async ({ filePath }: { filePath: string }) => {
-  if (filePath !== PATH || disk === null) throw new Error('ENOENT: no such file or directory')
-  return { size: disk.length }
-})
-const writeFile = vi.fn<(request: { filePath: string; content: string }) => Promise<void>>()
-
-const fileWatch = {
-  start: vi.fn(),
-  stop: vi.fn(),
-  pause: vi.fn(),
-  resume: vi.fn(),
-  onFileChanged: vi.fn(() => () => {}),
-  onFileDeleted: vi.fn((cb: WatchCallback) => {
-    deletedListeners.push(cb)
-    return () => {
-      deletedListeners = deletedListeners.filter((l) => l !== cb)
-    }
-  }),
-  onFileError: vi.fn(() => () => {})
-}
+/** The writes the save add-on made. */
+const writes = (): Array<{ filePath: string; content: string }> => source.writeCalls
 
 function panelProps(): IDockviewPanelProps<{ filePath?: string; panelId?: string }> {
   const api = {
@@ -159,14 +142,19 @@ async function renderPanel(): Promise<HTMLTextAreaElement> {
   return editor
 }
 
-/** The file goes from disk and main reports it; the panel shows the deleted state. */
+/** The deleted notice, if shown. */
+const deletedNotice = (): HTMLElement | null => screen.queryByTestId(FRESHNESS_NOTICE_TEST_IDS.deleted)
+
+/** The file goes from disk and main reports it; the panel shows the deleted state once the re-check confirms. */
 async function deleteOnDisk(): Promise<void> {
-  disk = null
-  act(() => {
-    for (const listener of [...deletedListeners]) listener({ filePath: PATH })
-  })
-  await advance(0)
-  expect(screen.getByText(DELETED_BANNER)).toBeInTheDocument()
+  act(() => disk.remove(PATH))
+  await advance(TIMING_PROFILES.editor.deleteConfirmMs + 100)
+  expect(deletedNotice()).toBeInTheDocument()
+}
+
+/** The file is back (a branch switch): no event – the deleted state's probe finds it. */
+function backOnDisk(content: string): void {
+  disk.write(PATH, content, { silent: true })
 }
 
 const conflictBar = (): HTMLElement | null => screen.queryByTestId(TEST_IDS.FILE_CONFLICT_NOTIFICATION)
@@ -174,25 +162,27 @@ const conflictBar = (): HTMLElement | null => screen.queryByTestId(TEST_IDS.FILE
 describe('MarkdownEditorPanel – typing in a deleted tab, then the file comes back (#450)', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    disk = ORIGINAL
-    deletedListeners = []
-    mockShowToast.mockReset()
-    readFile.mockClear()
-    getStats.mockClear()
-    writeFile.mockReset().mockImplementation(async ({ content }) => {
-      disk = content
+    disk = new FakeDisk(realClock)
+    disk.write(PATH, ORIGINAL, { silent: true })
+    source = new FakeSource(disk)
+    let nextId = 0
+    const restorePausable = setPausableSourceForTests(source)
+    const restoreTrackers = setFreshnessEnvironmentForTests({
+      source,
+      clock: realClock,
+      newId: () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, '0')}`,
+      onCheck: () => () => {}
     })
-    fileWatch.start.mockReset().mockResolvedValue({ success: true })
-    fileWatch.stop.mockReset().mockResolvedValue({ success: true })
-    fileWatch.pause.mockReset().mockResolvedValue({ success: true })
-    fileWatch.resume.mockReset().mockResolvedValue({ success: true })
-    ;(window as unknown as { api: unknown }).api = {
-      file: { readFile, getStats, writeFile },
-      fileWatch
+    restoreEnvironment = () => {
+      restoreTrackers()
+      restorePausable()
     }
+    mockShowToast.mockReset()
+    ;(window as unknown as { api: unknown }).api = { file: {} }
   })
 
   afterEach(() => {
+    restoreEnvironment()
     vi.useRealTimers()
   })
 
@@ -204,18 +194,18 @@ describe('MarkdownEditorPanel – typing in a deleted tab, then the file comes b
     await advance(500)
     fireEvent.change(editor, { target: { value: TYPED } })
     await advance(500)
-    disk = FROM_OTHER_BRANCH
-    await advance(DELETED_FILE_PROBE_INTERVAL_MS - 1000)
+    backOnDisk(FROM_OTHER_BRANCH)
+    await advance(DELETED_PROBE_BACKOFF.maxMs - 1000)
 
-    expect(screen.queryByText(DELETED_BANNER)).not.toBeInTheDocument()
+    expect(deletedNotice()).not.toBeInTheDocument()
     expect(conflictBar()).toHaveTextContent('notes.md changed on disk')
     expect(editor.value).toBe(TYPED)
 
     // Long past the autosave debounce and its 30 s ceiling: the open choice
     // holds autosave back, so the other branch's file is not overwritten
     await advance(35_000)
-    expect(writeFile).not.toHaveBeenCalled()
-    expect(disk).toBe(FROM_OTHER_BRANCH)
+    expect(writes()).toEqual([])
+    expect(disk.content(PATH)).toBe(FROM_OTHER_BRANCH)
     expect(editor.value).toBe(TYPED)
     expect(conflictBar()).toBeInTheDocument()
   })
@@ -227,9 +217,9 @@ describe('MarkdownEditorPanel – typing in a deleted tab, then the file comes b
     fireEvent.change(editor, { target: { value: TYPED } })
     await advance(35_000)
 
-    expect(writeFile).not.toHaveBeenCalled()
-    expect(disk).toBeNull()
-    expect(screen.getByText(DELETED_BANNER)).toBeInTheDocument()
+    expect(writes()).toEqual([])
+    expect(disk.exists(PATH)).toBe(false)
+    expect(deletedNotice()).toBeInTheDocument()
     expect(editor.value).toBe(TYPED)
   })
 
@@ -241,12 +231,12 @@ describe('MarkdownEditorPanel – typing in a deleted tab, then the file comes b
     // next probe; the file is back just before then
     fireEvent.change(editor, { target: { value: TYPED } })
     await advance(1_900)
-    disk = FROM_OTHER_BRANCH
-    await advance(DELETED_FILE_PROBE_INTERVAL_MS)
+    backOnDisk(FROM_OTHER_BRANCH)
+    await advance(DELETED_PROBE_BACKOFF.maxMs)
 
-    expect(writeFile).not.toHaveBeenCalled()
-    expect(disk).toBe(FROM_OTHER_BRANCH)
-    expect(screen.queryByText(DELETED_BANNER)).not.toBeInTheDocument()
+    expect(writes()).toEqual([])
+    expect(disk.content(PATH)).toBe(FROM_OTHER_BRANCH)
+    expect(deletedNotice()).not.toBeInTheDocument()
     expect(conflictBar()).toHaveTextContent('notes.md changed on disk')
     expect(editor.value).toBe(TYPED)
   })
@@ -257,16 +247,18 @@ describe('MarkdownEditorPanel – typing in a deleted tab, then the file comes b
     // Typed half-way to the next probe, so the probe – not autosave – comes first
     await advance(1_000)
     fireEvent.change(editor, { target: { value: TYPED } })
-    disk = FROM_OTHER_BRANCH
-    await advance(DELETED_FILE_PROBE_INTERVAL_MS - 1_000)
+    backOnDisk(FROM_OTHER_BRANCH)
+    await advance(DELETED_PROBE_BACKOFF.maxMs - 1_000)
     expect(conflictBar()).toBeInTheDocument()
-    expect(writeFile).not.toHaveBeenCalled()
+    expect(writes()).toEqual([])
 
     fireEvent.click(screen.getByTestId(TEST_IDS.FILE_CONFLICT_BTN_KEEP))
-    await advance(2_000)
+    // Keep my version adopts the disk's stamp (one probe); autosave's 2 s start when the bar goes
+    await advance(0)
+    await advance(2_500)
 
-    expect(writeFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: PATH, content: TYPED }))
-    expect(disk).toBe(TYPED)
+    expect(writes()).toEqual([expect.objectContaining({ filePath: PATH, content: TYPED })])
+    expect(disk.content(PATH)).toBe(TYPED)
     expect(editor.value).toBe(TYPED)
   })
 
@@ -274,12 +266,12 @@ describe('MarkdownEditorPanel – typing in a deleted tab, then the file comes b
     const editor = await renderPanel()
     await deleteOnDisk()
 
-    disk = FROM_OTHER_BRANCH
-    await advance(DELETED_FILE_PROBE_INTERVAL_MS)
+    backOnDisk(FROM_OTHER_BRANCH)
+    await advance(DELETED_PROBE_BACKOFF.maxMs)
 
-    expect(screen.queryByText(DELETED_BANNER)).not.toBeInTheDocument()
+    expect(deletedNotice()).not.toBeInTheDocument()
     expect(conflictBar()).not.toBeInTheDocument()
     expect(editor.value).toBe(FROM_OTHER_BRANCH)
-    expect(writeFile).not.toHaveBeenCalled()
+    expect(writes()).toEqual([])
   })
 })
