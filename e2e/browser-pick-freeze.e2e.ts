@@ -13,6 +13,7 @@
  * waits only.
  */
 import { test, expect } from './fixtures/browserHarness'
+import { BROWSER_CHROMIUM_ARGS } from './fixtures/browser/serve'
 import {
   AgentTerminal,
   captureBox,
@@ -195,6 +196,8 @@ test.describe('025-AC-028 hover-only element and the freeze', () => {
 // splits (dockview drag is off by design) and hiding a tab discards its capture (025-FR-052), so one window never has
 // two captures held at once. The property is proven in main: BrowserPicks.test.ts writes two tabs' captures at once.
 test.describe('the capture is taken at the pick', () => {
+  // The camera request below needs a camera: a fake one, so a host without one (the Linux container) still asks.
+  test.use({ extraLaunchArgs: [...BROWSER_CHROMIUM_ARGS, '--use-fake-device-for-media-stream'] })
   test('025-AC-067 picked by click in state 2, then advanced and removed under the Change dialog: the screenshot and HTML show state 2 and the console has only entries from before the pick', async ({
     appWithTestProject,
     windowWithTestProject,

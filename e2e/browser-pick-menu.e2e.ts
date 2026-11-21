@@ -19,6 +19,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
+import { BROWSER_CHROMIUM_ARGS } from './fixtures/browser/serve'
 import { AgentTerminal, IS_MAC, near, PickFlow, PICK_WAIT_MS as WAIT_MS } from './pages/browser-pick-flow.page'
 import type { Box } from './pages/browser-pick.page'
 import { ECHO_AGENT } from './fixtures/browser/echoAgent'
@@ -604,6 +605,8 @@ test.describe('025-AC-031 dialog rules per action', () => {
 })
 
 test.describe('025-AC-073 menu and dialog stay out of the page\'s document', () => {
+  // The camera request below needs a camera: a fake one, so a host without one (the Linux container) still asks.
+  test.use({ extraLaunchArgs: [...BROWSER_CHROMIUM_ARGS, '--use-fake-device-for-media-stream'] })
   test('with the menu and then the Change dialog open the page finds no Erfana element, records no mutation and gets none of the typed keys', async ({
     appWithTestProject,
     windowWithTestProject,
